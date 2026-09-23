@@ -1,0 +1,166 @@
+const express = require('express');
+const db = require('../../config/db');
+
+const router = express.Router();
+
+
+// ==================== SEND SERVICE REQUEST ====================
+// Resident ki selected subscription information ko database mein
+// PENDING request ke taur par save karenge
+
+router.post('/service-request', (req, res) => {
+
+  console.log('Service Request API called');
+  console.log('Request data:', req.body);
+
+
+  // ==================== REQUEST DATA ====================
+  // Frontend se request ki required information receive kar rahe hain
+  const {
+    residentId,
+    providerId,
+    serviceType,
+    startDate,
+    selectedDays,
+    fromTime,
+    toTime,
+  } = req.body;
+
+
+  // ==================== REQUIRED DATA CHECK ====================
+  // Check kar rahe hain ke request ke liye sari required information available hai
+  if (
+    !residentId ||
+    !providerId ||
+    !serviceType ||
+    !startDate ||
+    !selectedDays ||
+    selectedDays.length === 0 ||
+    !fromTime ||
+    !toTime
+  ) {
+
+    return res.status(400).json({
+      message: 'Required request data is missing',
+    });
+  }
+
+
+  // ==================== FIND SERVICE ====================
+  // Service name se Service table ki service_id find kar rahe hain
+  const serviceSQL = `
+    SELECT service_id
+    FROM Service
+    WHERE service = ?
+    LIMIT 1
+  `;
+
+
+  db.query(
+    serviceSQL,
+    [serviceType],
+    (serviceError, serviceResults) => {
+
+      if (serviceError) {
+
+        console.log(
+          'Service lookup error:',
+          serviceError.message
+        );
+
+        return res.status(500).json({
+          message: 'Server error',
+        });
+      }
+
+
+      // ==================== SERVICE NOT FOUND ====================
+      // Agar requested service database mein nahi mili
+      if (serviceResults.length === 0) {
+
+        return res.status(404).json({
+          message: 'Service not found',
+        });
+      }
+
+
+      const serviceId = serviceResults[0].service_id;
+
+
+      // ==================== SELECTED DAYS FOR DATABASE ====================
+      // Array ko comma-separated text mein convert kar rahe hain
+      const selectedDaysText = selectedDays.join(',');
+
+
+      // ==================== INSERT SERVICE REQUEST ====================
+      // Request ko database mein PENDING status ke saath save kar rahe hain
+      const insertSQL = `
+        INSERT INTO ServiceRequest
+        (
+          resident_id,
+          provider_id,
+          service_id,
+          start_date,
+          selected_days,
+          from_time,
+          to_time,
+          status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+      `;
+
+
+      db.query(
+        insertSQL,
+        [
+          residentId,
+          providerId,
+          serviceId,
+          startDate,
+          selectedDaysText,
+          fromTime,
+          toTime,
+        ],
+        (insertError, insertResult) => {
+
+          if (insertError) {
+
+            console.log(
+              'Service request insert error:',
+              insertError.message
+            );
+
+            return res.status(500).json({
+              message: 'Request could not be saved',
+            });
+          }
+
+
+          // ==================== REQUEST CREATED ====================
+          // Database mein request successfully create ho gayi
+          console.log(
+            'Service request created:',
+            insertResult.insertId
+          );
+
+
+          return res.status(201).json({
+
+            message: 'Service request sent successfully',
+
+            // ==================== REQUEST ID ====================
+            // Newly created request ki ID frontend ko return kar rahe hain
+            requestId: insertResult.insertId,
+
+            // ==================== REQUEST STATUS ====================
+            // Initial request status PENDING hai
+            status: 'PENDING',
+          });
+        }
+      );
+    }
+  );
+});
+
+
+module.exports = router;
