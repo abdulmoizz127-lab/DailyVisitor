@@ -163,13 +163,98 @@ router.get('/accepted-services/:residentId', (req, res) => {
       );
 
 
-      // ==================== SEND ACCEPTED SERVICES AND DAYS ====================
-      // Accepted services ke saath service days bhi frontend ko bhej rahe hain
-      return res.status(200).json({
-        message: 'Resident accepted services fetched successfully',
-        services: results,
-        serviceDays: serviceDays,
-      });
+      /* ==================== GET ACCEPTED REQUEST IDS ==================== */
+      /* Accepted services ki request_id nikal rahe hain taake un ke items fetch kar sakein */
+
+      const requestIds = results.map(
+        service => service.request_id
+      );
+
+
+      /* ==================== NO ACCEPTED SERVICES ==================== */
+      /* Agar koi accepted service nahi hai to items query ki zaroorat nahi,
+         isliye pehle jaisa hi response bhej rahe hain */
+
+      if (requestIds.length === 0) {
+
+        return res.status(200).json({
+          message: 'Resident accepted services fetched successfully',
+          services: results,
+          serviceDays: serviceDays,
+        });
+      }
+
+
+      /* ==================== GET SERVICE REQUEST ITEMS ==================== */
+      /* ServiceRequestItem table se in sab requests ke items aur quantities nikal rahe hain */
+
+      const itemsSQL = `
+        SELECT
+          request_id,
+          selected_days,
+          item_name,
+          quantity
+
+        FROM ServiceRequestItem
+
+        WHERE request_id IN (?)
+
+        ORDER BY request_item_id ASC
+      `;
+
+
+      /* ==================== RUN ITEMS QUERY ==================== */
+
+      db.query(
+        itemsSQL,
+        [requestIds],
+        (itemsError, itemsResults) => {
+
+          /* ==================== ITEMS DATABASE ERROR ==================== */
+
+          if (itemsError) {
+
+            console.log(
+              'Resident service items error:',
+              itemsError.message
+            );
+
+            return res.status(500).json({
+              message: 'Server error',
+            });
+          }
+
+
+          /* ==================== ATTACH ITEMS TO SERVICES ==================== */
+          /* Har service ke matching items service.items mein laga rahe hain.
+             Agar kisi service ke items na hon to empty array rahega.
+             quantity ko number bana rahe hain (DECIMAL string ki jagah). */
+
+          results.forEach(service => {
+
+            service.items = itemsResults
+              .filter(
+                item => item.request_id === service.request_id
+              )
+              .map(item => ({
+                request_id: item.request_id,
+                selected_days: item.selected_days,
+                item_name: item.item_name,
+                quantity: Number(item.quantity),
+              }));
+
+          });
+
+
+          // ==================== SEND ACCEPTED SERVICES AND DAYS ====================
+          // Accepted services ke saath service days bhi frontend ko bhej rahe hain
+          return res.status(200).json({
+            message: 'Resident accepted services fetched successfully',
+            services: results,
+            serviceDays: serviceDays,
+          });
+        }
+      );
     }
   );
 });

@@ -8,9 +8,66 @@ import {
   ScrollView,
 } from 'react-native';
 
-export default function ResidentActivity({navigation}) {
+// CHANGED: Component now receives "route" as well, so it can read the userId and name sent from other Resident screens
+export default function ResidentActivity({navigation, route}) {
+
+  // CHANGED: Resident id and name received from other Resident screens (same param names Home uses)
+  const residentId = route?.params?.userId;
+  const residentNameParam = route?.params?.name;
 
   const [activeTab, setActiveTab] = useState('Pending');
+
+  // CHANGED: Go back to the already mounted ResidentHome when it is the previous screen,
+  // so its service cards and params stay intact. Otherwise navigate to ResidentHome and
+  // send userId/name (only when available) so Home can still load its services.
+  const goHome = () => {
+    const navState = navigation.getState();
+    const previousRoute = navState?.routes?.[navState.index - 1];
+
+    if (navState?.type === 'stack' && previousRoute?.name === 'ResidentHome') {
+      navigation.goBack();
+      return;
+    }
+
+    const homeParams = {};
+
+    if (residentId) {
+      homeParams.userId = residentId;
+    }
+
+    if (residentNameParam) {
+      homeParams.name = residentNameParam;
+    }
+
+    navigation.navigate({
+      name: 'ResidentHome',
+      params: homeParams,
+      merge: true,
+    });
+  };
+
+  // CHANGED: Schedule tab now opens ResidentSchedule (it had no onPress before)
+  const goSchedule = () => {
+    navigation.navigate('ResidentSchedule', {
+      userId: residentId,
+      name: residentNameParam,
+    });
+  };
+
+  // CHANGED: Profile tab now opens ResidentProfile with userId and name (it had no onPress before)
+  const goProfile = () => {
+    navigation.navigate('ResidentProfile', {
+      userId: residentId,
+      name: residentNameParam,
+    });
+  };
+
+  // CHANGED: Plus button now sends residentId to NewSubscription, exactly like ResidentHome
+  const handlePlusPress = () => {
+    navigation.navigate('NewSubscription', {
+      residentId: residentId,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -48,7 +105,7 @@ export default function ResidentActivity({navigation}) {
               activeTab === 'Pending' && styles.activeCount,
             ]}
           >
-            2
+            1
           </Text>
         </TouchableOpacity>
 
@@ -75,7 +132,7 @@ export default function ResidentActivity({navigation}) {
               activeTab === 'Completed' && styles.activeCount,
             ]}
           >
-            1
+            0
           </Text>
         </TouchableOpacity>
 
@@ -117,42 +174,7 @@ export default function ResidentActivity({navigation}) {
                 </Text>
 
                 <Text style={styles.date}>
-                  2026-09-06 • 07:00 AM
-                </Text>
-
-              </View>
-
-              <View style={styles.waiting}>
-                <Text style={styles.waitingText}>
-                  Waiting
-                </Text>
-              </View>
-
-            </View>
-
-
-            {/* Second Delivery */}
-
-            <View style={styles.card}>
-
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  AM
-                </Text>
-              </View>
-
-              <View style={styles.cardInfo}>
-
-                <Text style={styles.deliveryTitle}>
-                  Milk Delivery
-                </Text>
-
-                <Text style={styles.name}>
-                  Abdul Moiz
-                </Text>
-
-                <Text style={styles.date}>
-                  2026-09-06 • 07:30 AM
+                  2026-09-27 • 07:00 AM
                 </Text>
 
               </View>
@@ -175,35 +197,7 @@ export default function ResidentActivity({navigation}) {
               COMPLETED
             </Text>
 
-            <View style={styles.card}>
-
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>
-                  AJ
-                </Text>
-              </View>
-
-              <View style={styles.cardInfo}>
-
-                <Text style={styles.deliveryTitle}>
-                  Milk Delivery
-                </Text>
-
-                <Text style={styles.name}>
-                  Ali Jahanzaib
-                </Text>
-
-                <Text style={styles.date}>
-                  Completed
-                </Text>
-
-              </View>
-
-              <Text style={styles.paid}>
-                Paid
-              </Text>
-
-            </View>
+            {/* No completed deliveries */}
 
           </>
 
@@ -214,12 +208,16 @@ export default function ResidentActivity({navigation}) {
 
       {/* Center + Button */}
 
-      <TouchableOpacity style={styles.fab}
-      onPress={() => navigation.navigate('NewSubscription')}>
+      {/* CHANGED: Plus button uses handlePlusPress so residentId is sent to NewSubscription */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={handlePlusPress}
+      >
         
         <Text style={styles.fabText}>
           +
         </Text>
+
       </TouchableOpacity>
 
 
@@ -229,9 +227,10 @@ export default function ResidentActivity({navigation}) {
 
         {/* Home */}
 
+        {/* CHANGED: Home tab uses goHome (keeps Home cards and sends userId/name when needed) */}
         <TouchableOpacity
           style={styles.bottomItem}
-          onPress={() => navigation.navigate('ResidentHome')}
+          onPress={goHome}
         >
           <Text style={styles.bottomIcon}>
             🏠
@@ -265,7 +264,11 @@ export default function ResidentActivity({navigation}) {
 
         {/* Schedule */}
 
-        <TouchableOpacity style={styles.bottomItem}>
+        {/* CHANGED: Schedule tab now has an onPress handler */}
+        <TouchableOpacity
+          style={styles.bottomItem}
+          onPress={goSchedule}
+        >
 
           <Text style={styles.bottomIcon}>
             📅
@@ -280,7 +283,11 @@ export default function ResidentActivity({navigation}) {
 
         {/* Profile */}
 
-        <TouchableOpacity style={styles.bottomItem}>
+        {/* CHANGED: Profile tab now has an onPress handler */}
+        <TouchableOpacity
+          style={styles.bottomItem}
+          onPress={goProfile}
+        >
 
           <Text style={styles.bottomIcon}>
             👤

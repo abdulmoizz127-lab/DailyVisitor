@@ -331,15 +331,31 @@ export default function VisitorHome({navigation, route}) {
 
   // ==================== USE SELECTED DAY SERVICES ====================
 // Existing Current Task aur Timeline ko selected day ke according update kar rahe hain
-const todayServices =
-  selectedDayServices;
+/* ==================== SORT BY ROUTE SEQUENCE ==================== */
+/* Same time window mein deliveries ko backend ke route_order ke according show kar rahe hain */
 
+const todayServices = [...selectedDayServices].sort((a, b) => {
+  const timeA = String(a.from_time || '');
+  const timeB = String(b.from_time || '');
+
+  if (timeA !== timeB) {
+    return timeA.localeCompare(timeB);
+  }
+
+  const toTimeA = String(a.to_time || '');
+  const toTimeB = String(b.to_time || '');
+
+  if (toTimeA !== toTimeB) {
+    return toTimeA.localeCompare(toTimeB);
+  }
+
+  return Number(a.route_order || 999) - Number(b.route_order || 999);
+});
 
 // ==================== GET TODAY NAME FOR CURRENT TASK ====================
 // Aaj ka actual weekday name nikal rahe hain
 const todayNameForTask =
   getTodayName();
-
 
 // ==================== CURRENT TASK ONLY FOR TODAY ====================
 // Current Task sirf aaj ke selected day par show hoga
@@ -363,25 +379,45 @@ const currentTask =
       service.resident_province,
     ].filter(Boolean);
 
-
     // ==================== CHECK ADDRESS ====================
     // Agar address available hai to combine karke return karenge
     if (addressParts.length > 0) {
       return addressParts.join(', ');
     }
 
-
     // ==================== DEFAULT ADDRESS ====================
     // Agar address available nahi hai
     return 'Address not available';
   };
 
+  /* ==================== SERVICE ITEMS ==================== */
+  /* Accepted service ke selected items aur quantities nikal rahe hain.
+     Backend se aane wale service.items mein se sirf selected day ke items return hote hain.
+     Agar service.items missing ya empty ho to empty array return hoga, error nahi aayega. */
 
-  // ==================== GET DELIVERY COUNT ====================
-  // Selected day ki total accepted deliveries count kar rahe hain
+  const getServiceItems = service => {
+
+    return (service.items || []).filter(item => {
+
+      if (
+        !selectedDay ||
+        !item.selected_days
+      ) {
+        return true;
+      }
+
+      return String(item.selected_days)
+        .split(',')
+        .map(day => day.trim().toLowerCase())
+        .includes(selectedDay.toLowerCase());
+    });
+  };
+
+
+// ==================== GET DELIVERY COUNT ====================
+// Selected day ki total accepted deliveries count kar rahe hain
   const todayDeliveryCount =
     todayServices.length;
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -391,7 +427,7 @@ const currentTask =
         contentContainerStyle={styles.scrollContent}
       >
 
-        {/* ==================== HEADER ==================== */}
+{/* ==================== HEADER ==================== */}
 
         <View style={styles.header}>
 
@@ -401,9 +437,8 @@ const currentTask =
               Hello, {visitorName} 👋
             </Text>
 
-
-            {/* ==================== PROVIDER AVAILABILITY ==================== */}
-            {/* Provider ka current availability status show kar rahe hain */}
+{/* ==================== PROVIDER AVAILABILITY ==================== */}
+{/* Provider ka current availability status show kar rahe hain */}
 
             <View style={styles.available}>
 
@@ -417,9 +452,8 @@ const currentTask =
 
           </View>
 
-
-          {/* ==================== OPEN NOTIFICATIONS ==================== */}
-          {/* Notification screen par provider ka userId bhej rahe hain */}
+{/* ==================== OPEN NOTIFICATIONS ==================== */}
+{/* Notification screen par provider ka userId bhej rahe hain */}
 
           <TouchableOpacity
             style={styles.notificationButton}
@@ -441,9 +475,8 @@ const currentTask =
 
         </View>
 
-
-        {/* ==================== TODAY DELIVERIES SUMMARY ==================== */}
-        {/* Selected day's accepted deliveries count show kar rahe hain */}
+{/* ==================== TODAY DELIVERIES SUMMARY ==================== */}
+{/* Selected day's accepted deliveries count show kar rahe hain */}
 
         <View style={styles.summaryCard}>
 
@@ -457,9 +490,8 @@ const currentTask =
 
             </View>
 
-
-            {/* ==================== SELECTED DAY SUMMARY LABEL ==================== */}
-            {/* Selected day ko summary card ke top par show kar rahe hain */}
+{/* ==================== SELECTED DAY SUMMARY LABEL ==================== */}
+{/* Selected day ko summary card ke top par show kar rahe hain */}
 
             <Text style={styles.today}>
               {selectedDay || 'Day'}
@@ -467,17 +499,15 @@ const currentTask =
 
           </View>
 
-
-          {/* ==================== DYNAMIC DELIVERY COUNT ==================== */}
-          {/* Selected day's deliveries ka count show kar rahe hain */}
+{/* ==================== DYNAMIC DELIVERY COUNT ==================== */}
+{/* Selected day's deliveries ka count show kar rahe hain */}
 
           <Text style={styles.count}>
             {todayDeliveryCount}
           </Text>
 
-
-          {/* ==================== SELECTED DAY DELIVERY LABEL ==================== */}
-          {/* Selected day ke according delivery label show kar rahe hain */}
+{/* ==================== SELECTED DAY DELIVERY LABEL ==================== */}
+{/* Selected day ke according delivery label show kar rahe hain */}
 
           <Text style={styles.deliveryText}>
             {selectedDay
@@ -487,9 +517,8 @@ const currentTask =
 
         </View>
 
-
-        {/* ==================== SERVICE DAYS ROW ==================== */}
-        {/* Backend ke Shift table se aaye actual provider service days show kar rahe hain */}
+{/*==================== SERVICE DAYS ROW ==================== */}
+{/* Backend ke Shift table se aaye actual provider service days show kar rahe hain */}
 
         {providerDays.length > 0 && (
 
@@ -502,8 +531,8 @@ const currentTask =
 
               {providerDays.map(day => {
 
-                // ==================== CHECK SELECTED DAY ====================
-                // Check kar rahe hain ke ye day selected hai ya nahi
+// ==================== CHECK SELECTED DAY ====================
+// Check kar rahe hain ke ye day selected hai ya nahi
 
                 const isSelected =
                   selectedDay &&
@@ -543,16 +572,14 @@ const currentTask =
           </View>
         )}
 
-
-        {/* ==================== CURRENT TASK TITLE ==================== */}
+{/* ==================== CURRENT TASK TITLE ==================== */}
 
         <Text style={styles.sectionTitle}>
           Current Task
         </Text>
 
-
-        {/* ==================== CURRENT TASK ==================== */}
-        {/* Selected day ki first accepted delivery ko Current Task mein show kar rahe hain */}
+{/* ==================== CURRENT TASK ==================== */}
+{/* Selected day ki first accepted delivery ko Current Task mein show kar rahe hain */}
 
         {currentTask ? (
 
@@ -564,35 +591,78 @@ const currentTask =
                 Next Delivery
               </Text>
 
-
-              {/* ==================== DELIVERY TIME ==================== */}
-              {/* Resident ke selected from time ko show kar rahe hain */}
+{/* ==================== DELIVERY SLOT ==================== */}
+{/* Backend se calculated actual 10-minute delivery slot show kar rahe hain */}
 
               <Text style={styles.minutes}>
-                {formatTime(currentTask.from_time)}
+                 {formatTime(
+                 currentTask.delivery_start_time || currentTask.from_time
+                 )}
               </Text>
-
             </View>
 
+{/* ==================== RESIDENT NAME AND DISTANCE ROW ==================== */}
+{/* Resident name left side par aur provider distance right side par, ek hi row mein */}
 
-            {/* ==================== RESIDENT NAME ==================== */}
-            {/* Database se actual resident name show kar rahe hain */}
+            <View style={styles.residentNameRow}>
 
-            <Text style={styles.customerName}>
-              {currentTask.resident_name}
-            </Text>
+              <Text
+                style={[
+                  styles.customerName,
+                  styles.residentNameText,
+                ]}
+              >
+                {currentTask.resident_name}
+              </Text>
 
+{/* ==================== PROVIDER DISTANCE ==================== */}
+{/* Provider se resident tak ki road distance show kar rahe hain.
+    Distance null, undefined ya invalid ho to ye line show nahi hoti. */}
+              {
+              currentTask.provider_distance_km !== null &&
+                currentTask.provider_distance_km !== undefined &&
+                currentTask.provider_distance_km !== '' &&
+                !isNaN(Number(currentTask.provider_distance_km)) && (
 
-            {/* ==================== RESIDENT ADDRESS ==================== */}
-            {/* Database se actual resident location show kar rahe hain */}
+                <Text style={styles.taskDistanceText}>
+                  📍 {Number(currentTask.provider_distance_km).toFixed(3)} km away
+                </Text>
+              )}
+            </View>
+
+{/* ==================== SERVICE ITEMS ==================== */}
+{/* Accepted service ke selected items aur quantities display kar rahe hain */}
+
+            {getServiceItems(currentTask).length > 0 && (
+
+              <View style={styles.itemsContainer}>
+
+                {getServiceItems(currentTask).map(
+                  (item, index) => (
+
+                    <Text
+                      key={`${item.item_name}-${index}`}
+                      style={styles.taskItemText}
+                    >
+                      {item.item_name} - {item.quantity}
+                    </Text>
+
+                  ),
+                )}
+
+              </View>
+
+            )}
+
+{/* ==================== RESIDENT ADDRESS ==================== */}
+{/* Database se actual resident location show kar rahe hain */}
 
             <Text style={styles.detail}>
               📍 {getResidentAddress(currentTask)}
             </Text>
 
-
-            {/* ==================== SERVICE DATE AND TIME ==================== */}
-            {/* Resident ki selected date aur from/to time show kar rahe hain */}
+{/* ==================== SERVICE DATE AND TIME ==================== */}
+{/* Resident ki selected date aur from/to time show kar rahe hain */}
 
             <Text style={styles.detail}>
               🕐 {formatDate(currentTask.start_date)} •{' '}
@@ -600,21 +670,19 @@ const currentTask =
               {formatTime(currentTask.to_time)}
             </Text>
 
-
-            {/* ==================== SERVICE NAME ==================== */}
-            {/* Resident ne jo service request ki thi uska naam show kar rahe hain */}
+{/* ==================== SERVICE NAME ==================== */}
+{/* Resident ne jo service request ki thi uska naam show kar rahe hain */}
 
             <Text style={styles.detail}>
-              🔧 {formatServiceName(currentTask.service)}
+              🗞️ {formatServiceName(currentTask.service)}
             </Text>
 
-
-            {/* ==================== CURRENT TASK BUTTONS ==================== */}
+{/* ==================== CURRENT TASK BUTTONS ==================== */}
 
             <View style={styles.buttonRow}>
 
-              {/* ==================== NAVIGATE BUTTON ==================== */}
-              {/* Abhi map backend/screen nahi banaya, isliye placeholder alert hai */}
+{/* ==================== NAVIGATE BUTTON ==================== */}
+{/* Abhi map backend/screen nahi banaya, isliye placeholder alert hai */}
 
               <TouchableOpacity
                 style={styles.taskButton}
@@ -632,9 +700,8 @@ const currentTask =
 
               </TouchableOpacity>
 
-
-              {/* ==================== MARK ARRIVED BUTTON ==================== */}
-              {/* Abhi arrival backend nahi banaya, isliye placeholder alert hai */}
+{/* ==================== MARK ARRIVED BUTTON ==================== */}
+{/* Abhi arrival backend nahi banaya, isliye placeholder alert hai */}
 
               <TouchableOpacity
                 style={styles.taskButton}
@@ -658,21 +725,20 @@ const currentTask =
 
         ) : (
 
-          // ==================== NO CURRENT TASK ====================
-          // Agar selected day par koi accepted delivery nahi hai to ye message show hoga
+// ==================== NO CURRENT TASK ====================
+// Agar selected day par koi accepted delivery nahi hai to ye message show hoga
 
           <View style={styles.noTaskCard}>
 
-            {/* ==================== SELECTED DAY NO TASK TITLE ==================== */}
-            {/* Selected day par delivery na hone ki surat mein dynamic title show kar rahe hain */}
+{/* ==================== SELECTED DAY NO TASK TITLE ==================== */}
+{/* Selected day par delivery na hone ki surat mein dynamic title show kar rahe hain */}
 
             <Text style={styles.noTaskTitle}>
               No Delivery {selectedDay ? `on ${selectedDay}` : 'Today'}
             </Text>
 
-
-            {/* ==================== SELECTED DAY NO TASK MESSAGE ==================== */}
-            {/* Selected day ke according message show kar rahe hain */}
+{/* ==================== SELECTED DAY NO TASK MESSAGE ==================== */}
+{/* Selected day ke according message show kar rahe hain */}
 
             <Text style={styles.noTaskText}>
               {selectedDay
@@ -684,9 +750,8 @@ const currentTask =
 
         )}
 
-
-        {/* ==================== SELECTED DAY TIMELINE TITLE ==================== */}
-        {/* Selected day ke according timeline ka title show kar rahe hain */}
+{/* ==================== SELECTED DAY TIMELINE TITLE ==================== */}
+{/* Selected day ke according timeline ka title show kar rahe hain */}
 
         <Text style={styles.sectionTitle}>
           {selectedDay
@@ -694,9 +759,8 @@ const currentTask =
             : 'Timeline'}
         </Text>
 
-
-        {/* ==================== LOADING MESSAGE ==================== */}
-        {/* Backend data load hone tak loading message show kar rahe hain */}
+{/* ==================== LOADING MESSAGE ==================== */}
+{/* Backend data load hone tak loading message show kar rahe hain */}
 
         {loading && (
           <Text style={styles.emptyText}>
@@ -704,9 +768,8 @@ const currentTask =
           </Text>
         )}
 
-
-        {/* ==================== EMPTY TIMELINE ==================== */}
-        {/* Agar selected day par koi delivery nahi hai */}
+{/* ==================== EMPTY TIMELINE ==================== */}
+{/* Agar selected day par koi delivery nahi hai */}
 
         {!loading &&
           todayServices.length === 0 && (
@@ -719,9 +782,8 @@ const currentTask =
 
           )}
 
-
-        {/* ==================== DYNAMIC SELECTED DAY TIMELINE ==================== */}
-        {/* Selected day ki saari accepted deliveries automatically show kar rahe hain */}
+{/* ==================== DYNAMIC SELECTED DAY TIMELINE ==================== */}
+{/* Selected day ki saari accepted deliveries automatically show kar rahe hain */}
 
         {!loading &&
           todayServices.map(
@@ -732,8 +794,8 @@ const currentTask =
                 style={styles.timelineItem}
               >
 
-                {/* ==================== TIMELINE DOT ==================== */}
-                {/* Current first task ko green aur baaki ko grey dot de rahe hain */}
+{/* ==================== TIMELINE DOT ==================== */}
+{/* Current first task ko green aur baaki ko grey dot de rahe hain */}
 
                 <View
                   style={
@@ -748,16 +810,17 @@ const currentTask =
 
                   <View style={styles.timelineTop}>
 
-                    {/* ==================== TIMELINE TIME ==================== */}
-                    {/* Resident ka selected from time show kar rahe hain */}
+{/* ==================== TIMELINE DELIVERY SLOT ==================== */}
+{/* Backend se calculated actual delivery slot show kar rahe hain */}
 
-                    <Text style={styles.time}>
-                      {formatTime(service.from_time)}
-                    </Text>
+                <Text style={styles.time}>
+                   {
+                    formatTime( service.delivery_start_time || service.from_time
+                   )}
+                </Text>
 
-
-                    {/* ==================== TIMELINE SERVICE ==================== */}
-                    {/* Actual service name show kar rahe hain */}
+{/* ==================== TIMELINE SERVICE ==================== */}
+{/* Actual service name show kar rahe hain */}
 
                     <Text
                       style={
@@ -773,27 +836,76 @@ const currentTask =
 
                   </View>
 
-
-                  {/* ==================== TIMELINE RESIDENT CARD ==================== */}
-                  {/* Actual resident aur address show kar rahe hain */}
+{/* ==================== TIMELINE RESIDENT CARD ==================== */}
+{/* Actual resident aur address show kar rahe hain */}
 
                   <View style={styles.timelineCard}>
 
-                    <Text style={styles.timelineName}>
-                      {service.resident_name}
-                    </Text>
+{/* ==================== TIMELINE NAME AND DISTANCE ROW ==================== */}
+{/* Resident name left side par aur provider distance right side par, ek hi row mein */}
+
+                    <View style={styles.timelineNameRow}>
+
+                      <Text
+                        style={[
+                          styles.timelineName,
+                          styles.timelineNameText,
+                        ]}
+                      >
+                        {service.resident_name}
+                      </Text>
+
+{/* ==================== PROVIDER DISTANCE ==================== */}
+{/* Provider se resident tak ki road distance show kar rahe hain.
+    Distance null, undefined ya invalid ho to ye line show nahi hoti. */}
+
+                      {service.provider_distance_km !== null &&
+                        service.provider_distance_km !== undefined &&
+                        service.provider_distance_km !== '' &&
+                        !isNaN(Number(service.provider_distance_km)) && (
+
+                        <Text style={styles.timelineDistanceText}>
+                          📍 {Number(service.provider_distance_km).toFixed(3)} km away
+                        </Text>
+
+                      )}
+
+                    </View>
 
 
-                    {/* ==================== TIMELINE ADDRESS ==================== */}
-                    {/* Resident ka actual address show kar rahe hain */}
+{/* ==================== SERVICE ITEMS ==================== */}
+{/* Accepted service ke selected items aur quantities display kar rahe hain */}
+
+                    {getServiceItems(service).length > 0 && (
+
+                      <View style={styles.itemsContainer}>
+
+                        {getServiceItems(service).map(
+                          (item, itemIndex) => (
+
+                            <Text
+                              key={`${item.item_name}-${itemIndex}`}
+                              style={styles.timelineItemText}
+                            >
+                              {item.item_name} - {item.quantity}
+                            </Text>
+
+                          ),
+                        )}
+
+                      </View>
+
+                    )}
+
+{/* ==================== TIMELINE ADDRESS ==================== */}
+{/* Resident ka actual address show kar rahe hain */}
 
                     <Text style={styles.address}>
                       📍 {getResidentAddress(service)}
                     </Text>
 
-
-                    {/* ==================== TIMELINE FULL TIME ==================== */}
-                    {/* From aur to time bhi show kar rahe hain */}
+{/* ==================== TIMELINE FULL TIME ==================== */}
+{/* From aur to time bhi show kar rahe hain */}
 
                     <Text style={styles.address}>
                       🕐 {formatTime(service.from_time)} -{' '}
@@ -809,105 +921,94 @@ const currentTask =
             ),
           )}
 
-
         <View style={{height: 30}} />
 
       </ScrollView>
 
+{/* ==================== BOTTOM TABS ==================== */}
+{/* Changed: Home, Activity, Schedule, Profile */}
 
-      {/* ==================== BOTTOM TABS ==================== */}
+<View style={styles.bottomBar}>
 
-      <View style={styles.bottomBar}>
+  {/* Home Tab - current screen */}
+  <TouchableOpacity style={styles.tab}>
+    <Text style={styles.activeIcon}>🏠</Text>
+    <Text style={styles.activeText}>Home</Text>
+  </TouchableOpacity>
 
-        {/* ==================== HOME TAB ==================== */}
+  {/* Added: Activity Tab */}
+  {/* MODIFIED: Activity screen ko visitor ka userId aur name bhej rahe hain,
+      taake Activity se wapas Home aate waqt cards dobara load ho sakein.
+      visitorUserId aur visitorName wohi variables hain jo upar route.params se read hote hain. */}
+  <TouchableOpacity
+    style={styles.tab}
+    onPress={() =>
+      navigation.navigate('VisitorActivity', {
+        userId: visitorUserId,
+        name: visitorName,
+      })
+    }
+  >
+    <Text style={styles.icon}>◉</Text>
+    <Text style={styles.text}>Activity</Text>
+  </TouchableOpacity>
 
-        <TouchableOpacity style={styles.tab}>
+  {/* Changed: Schedule moved to third position */}
+  {/* MODIFIED: Schedule screen ko visitor ka userId aur name bhej rahe hain,
+      taake Schedule se wapas Home aate waqt cards dobara load ho sakein.
+      Route 'Schedule' App.js mein registered hai. */}
+  <TouchableOpacity
+    style={styles.tab}
+    onPress={() =>
+      navigation.navigate('Schedule', {
+        userId: visitorUserId,
+        name: visitorName,
+      })
+    }
+  >
+    <Text style={styles.icon}>📅</Text>
+    <Text style={styles.text}>Schedule</Text>
+  </TouchableOpacity>
 
-          <Text style={styles.activeIcon}>
-            🏠
-          </Text>
+  {/* Profile Tab - kept in last position */}
+  {/* MODIFIED: Profile screen ko visitor ka userId aur name bhej rahe hain,
+      taake Profile se wapas Home aate waqt cards dobara load ho sakein.
+      visitorUserId aur visitorName wohi variables hain jo upar route.params se read hote hain. */}
+  <TouchableOpacity
+  style={styles.tab}
+  onPress={() =>
+    navigation.navigate('Profile', {
+      userId: visitorUserId,
+      name: visitorName,
+    })
+  }
+>
+  <Text style={styles.icon}>👤</Text>
+  <Text style={styles.text}>Profile</Text>
+</TouchableOpacity>
 
-          <Text style={styles.activeText}>
-            Home
-          </Text>
-
-        </TouchableOpacity>
-
-
-        {/* ==================== SCHEDULE TAB ==================== */}
-        {/* Provider Schedule screen ko open karne ke liye navigation */}
-
-        <TouchableOpacity
-          style={styles.tab}
-          onPress={() =>
-            navigation.navigate('Schedule')
-          }
-        >
-
-          <Text style={styles.icon}>
-            📅
-          </Text>
-
-          <Text style={styles.text}>
-            Schedule
-          </Text>
-
-        </TouchableOpacity>
-
-
-        {/* ==================== SERVICES TAB ==================== */}
-
-        <TouchableOpacity style={styles.tab}>
-
-          <Text style={styles.icon}>
-            💼
-          </Text>
-
-          <Text style={styles.text}>
-            Services
-          </Text>
-
-        </TouchableOpacity>
-
-
-        {/* ==================== PROFILE TAB ==================== */}
-
-        <TouchableOpacity style={styles.tab}>
-
-          <Text style={styles.icon}>
-            👤
-          </Text>
-
-          <Text style={styles.text}>
-            Profile
-          </Text>
-
-        </TouchableOpacity>
-
-      </View>
-
+</View>
     </SafeAreaView>
   );
 }
 
-
 const styles = StyleSheet.create({
 
-  // ==================== MAIN CONTAINER ====================
+// ==================== MAIN CONTAINER ====================
   container: {
     flex: 1,
     backgroundColor: '#F5F7FA',
   },
 
 
-  // ==================== SCROLL CONTENT ====================
+// ==================== SCROLL CONTENT ====================
   scrollContent: {
     padding: 20,
     paddingBottom: 30,
   },
 
 
-  // ==================== HEADER ====================
+// ==================== HEADER ====================
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1134,6 +1235,59 @@ const styles = StyleSheet.create({
   },
 
 
+  /* ==================== RESIDENT NAME AND DISTANCE ROW (CURRENT TASK) ==================== */
+  /* Current Task mein resident name (left) aur distance (right) ko ek hi row mein rakhne ke liye */
+  residentNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
+  },
+
+
+  /* ==================== RESIDENT NAME TEXT (CURRENT TASK) ==================== */
+  /* Naam ko bachi hui jagah deta hai taake lamba naam ho to distance right side par hi rahe */
+  residentNameText: {
+    flex: 1,
+    marginRight: 8,
+  },
+
+
+  /* ==================== PROVIDER DISTANCE (CURRENT TASK) ==================== */
+  /* Current Task mein resident name ke right side par distance ka chhota white text.
+     marginTop 12 se ye naam ki line ke saath barabar nazar aata hai (customerName ka marginTop 8 hai). */
+  taskDistanceText: {
+    color: 'white',
+    fontSize: 12,
+    marginTop: 12,
+  },
+
+
+  /* ==================== SERVICE ITEMS CONTAINER ==================== */
+  /* Items aur quantities ki list ke liye spacing (Current Task aur Timeline dono mein) */
+  itemsContainer: {
+    marginBottom: 8,
+  },
+
+
+  /* ==================== CURRENT TASK ITEM TEXT ==================== */
+  /* Current Task (green card) mein item aur quantity ka white text */
+  taskItemText: {
+    color: 'white',
+    fontSize: 13,
+    marginBottom: 3,
+  },
+
+
+  /* ==================== TIMELINE ITEM TEXT ==================== */
+  /* Timeline card mein item aur quantity ka text */
+  timelineItemText: {
+    fontSize: 13,
+    color: '#374151',
+    marginBottom: 3,
+  },
+
+
   // ==================== CURRENT TASK DETAILS ====================
   detail: {
     color: 'white',
@@ -1292,6 +1446,33 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 4,
+  },
+
+
+  /* ==================== TIMELINE NAME AND DISTANCE ROW ==================== */
+  /* Timeline card mein resident name (left) aur distance (right) ko ek hi row mein rakhne ke liye */
+  timelineNameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    width: '100%',
+  },
+
+
+  /* ==================== TIMELINE NAME TEXT ==================== */
+  /* Naam ko bachi hui jagah deta hai taake lamba naam ho to distance right side par hi rahe */
+  timelineNameText: {
+    flex: 1,
+    marginRight: 8,
+  },
+
+
+  /* ==================== PROVIDER DISTANCE (TIMELINE) ==================== */
+  /* Timeline card mein resident name ke right side par distance ka chhota grey text */
+  timelineDistanceText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 1,
   },
 
 

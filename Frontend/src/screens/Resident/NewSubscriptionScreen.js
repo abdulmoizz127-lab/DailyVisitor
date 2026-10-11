@@ -1,7 +1,5 @@
 import React, {useState} from 'react';
 
-// ==================== DATE TIME PICKER ====================
-// Start Date aur Time Slot ke liye DateTimePicker use kar rahe hain
 import DateTimePicker from '@react-native-community/datetimepicker';
 
 import {
@@ -13,30 +11,13 @@ import {
   SafeAreaView,
   Modal,
   FlatList,
+  Alert,
 } from 'react-native';
-
 
 const serviceTypes = [
   'Milkman',
   'Newspaper',
   'Garbage Collector',
-];
-
-const milkTypes = ['Cow', 'Buffalo'];
-
-const quantities = [
-  '1 Liter',
-  '2 Liters',
-  '3 Liters',
-  '4 Liters',
-];
-
-const languages = ['English', 'Urdu'];
-
-const newspapers = [
-  'Dawn',
-  'Jang',
-  'Nawa-i-Waqt',
 ];
 
 const radiusOptions = [
@@ -46,76 +27,266 @@ const radiusOptions = [
   '10 km',
 ];
 
-const days = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
+/* ==================== GROUP DAY BUTTONS ==================== */
+
+const groupDayButtons = [
+  {day: 'Monday', short: 'Mon'},
+  {day: 'Tuesday', short: 'Tue'},
+  {day: 'Wednesday', short: 'Wed'},
+  {day: 'Thursday', short: 'Thu'},
+  {day: 'Friday', short: 'Fri'},
+  {day: 'Saturday', short: 'Sat'},
+  {day: 'Sunday', short: 'Sun'},
 ];
 
+/* ==================== MILK PRODUCT OPTIONS ==================== */
+
+const milkProductOptions = [
+  {name: 'Cow Milk', emoji: '🐄'},
+  {name: 'Goat Milk', emoji: '🐐'},
+  {name: 'Camel Milk', emoji: '🐪'},
+  {name: 'Cheese', emoji: '🧀'},
+  {name: 'Ghee', emoji: '🧈'},
+];
+
+/* ==================== NEWSPAPER PRODUCTS ==================== */
+
+const newspaperOptions = [
+  'Dawn',
+  'The News',
+  'Jang',
+  'Express',
+  'Geo',
+];
+
+/* ==================== CREATE SERVICE GROUP ==================== */
+
+const createServiceGroup = id => ({
+  id: id,
+  days: [],
+  products: [],
+  quantities: {
+    'Cow Milk': 1,
+    'Goat Milk': 1,
+    'Camel Milk': 1,
+    'Cheese': 0.25,
+    'Ghee': 0.25,
+  },
+  newspapers: [],
+  newspaperQuantities: {
+    Dawn: 1,
+    'The News': 1,
+    Jang: 1,
+    Express: 1,
+    Geo: 1,
+  },
+  garbageQuantity: 1,
+});
 
 export default function NewSubscriptionScreen({navigation, route}) {
 
-  // ==================== RESIDENT ID ====================
-  // ResidentHome se aane wala residentId receive kar rahe hain
+  /* ==================== RESIDENT ID ==================== */
 
   const residentId = route.params?.residentId;
 
-
   const [serviceType, setServiceType] = useState('Milkman');
-  const [milkType, setMilkType] = useState('Cow');
-  const [quantity, setQuantity] = useState('1 Liter');
 
-  const [language, setLanguage] = useState('English');
-  const [newspaper, setNewspaper] = useState('Dawn');
+  /* ==================== SERVICE GROUPS ==================== */
 
+  const [serviceGroups, setServiceGroups] = useState([
+    createServiceGroup(1),
+  ]);
 
-  // ==================== DATE TIME PICKER ====================
-  // Selected Start Date store karne ke liye
+  /* ==================== ADD ANOTHER DAY GROUP ==================== */
+
+  const addServiceGroup = () => {
+
+    setServiceGroups([
+      ...serviceGroups,
+      createServiceGroup(serviceGroups.length + 1),
+    ]);
+
+  };
+
+  /* ==================== UPDATE SINGLE GROUP ==================== */
+
+  const updateGroup = (groupId, changes) => {
+
+    setServiceGroups(
+      serviceGroups.map(group =>
+        group.id === groupId
+          ? {...group, ...changes}
+          : group
+      )
+    );
+
+  };
+
+  /* ==================== GROUP DAY TOGGLE ==================== */
+
+  const toggleGroupDay = (group, day) => {
+
+    if (group.days.includes(day)) {
+
+      updateGroup(group.id, {
+        days: group.days.filter(item => item !== day),
+      });
+
+    } else {
+
+      updateGroup(group.id, {
+        days: [
+          ...group.days,
+          day,
+        ],
+      });
+
+    }
+  };
+
+  /* ==================== GROUP PRODUCT TOGGLE ==================== */
+
+  const toggleGroupProduct = (group, product) => {
+
+    if (group.products.includes(product)) {
+
+      updateGroup(group.id, {
+        products: group.products.filter(item => item !== product),
+      });
+
+    } else {
+
+      updateGroup(group.id, {
+        products: [
+          ...group.products,
+          product,
+        ],
+      });
+
+    }
+  };
+
+  /* ==================== QUANTITY UNIT ==================== */
+
+  const getQuantityUnit = product => {
+
+    if (
+      product === 'Cheese' ||
+      product === 'Ghee'
+    ) {
+      return 'kg';
+    }
+
+    return 'L';
+  };
+
+  /* ==================== QUANTITY CHANGE ==================== */
+
+  const changeQuantity = (group, product, change) => {
+
+    const step = 0.25;
+    const minimum = 0.25;
+
+    const newQuantity =
+      group.quantities[product] +
+      change * step;
+
+    if (newQuantity >= minimum) {
+
+      updateGroup(group.id, {
+        quantities: {
+          ...group.quantities,
+          [product]: Number(
+            newQuantity.toFixed(2)
+          ),
+        },
+      });
+
+    }
+  };
+
+  /* ==================== NEWSPAPER TOGGLE ==================== */
+
+  const toggleNewspaper = (group, newspaper) => {
+
+    if (group.newspapers.includes(newspaper)) {
+
+      updateGroup(group.id, {
+        newspapers: group.newspapers.filter(item => item !== newspaper),
+      });
+
+    } else {
+
+      updateGroup(group.id, {
+        newspapers: [
+          ...group.newspapers,
+          newspaper,
+        ],
+      });
+
+    }
+  };
+
+  /* ==================== NEWSPAPER QUANTITY ==================== */
+
+  const changeNewspaperQuantity = (group, newspaper, change) => {
+
+    const newQuantity =
+      group.newspaperQuantities[newspaper] + change;
+
+    if (newQuantity >= 1) {
+
+      updateGroup(group.id, {
+        newspaperQuantities: {
+          ...group.newspaperQuantities,
+          [newspaper]: newQuantity,
+        },
+      });
+
+    }
+  };
+
+  /* ==================== GARBAGE QUANTITY ==================== */
+
+  const changeGarbageQuantity = (group, change) => {
+
+    const newQuantity = group.garbageQuantity + change;
+
+    if (newQuantity >= 1) {
+
+      updateGroup(group.id, {
+        garbageQuantity: newQuantity,
+      });
+
+    }
+  };
+
+  /* ==================== START DATE ==================== */
 
   const [startDate, setStartDate] = useState(new Date());
 
-  // Date Picker show/hide karne ke liye
+  const [showDatePicker, setShowDatePicker] =
+    useState(false);
 
-  const [showDatePicker, setShowDatePicker] = useState(false);
-
-
-  const [selectedDays, setSelectedDays] = useState([
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ]);
-
-
-  // ==================== TIME PICKER ====================
-  // From aur To time ke liye Date object use kar rahe hain
-  // Isse Visitor Signup jaisa scrollable spinner picker milega
+  /* ==================== TIME PICKER ==================== */
 
   const [fromTime, setFromTime] = useState(new Date());
+
   const [toTime, setToTime] = useState(new Date());
 
+  const [showFromTimePicker, setShowFromTimePicker] =
+    useState(false);
 
-  // ==================== TIME PICKER VISIBILITY ====================
-  // From aur To Time Picker ko show/hide karne ke liye
+  const [showToTimePicker, setShowToTimePicker] =
+    useState(false);
 
-  const [showFromTimePicker, setShowFromTimePicker] = useState(false);
-  const [showToTimePicker, setShowToTimePicker] = useState(false);
-
+  /* ==================== PROVIDER RADIUS ==================== */
 
   const [radius, setRadius] = useState('5 km');
 
   const [modal, setModal] = useState(null);
 
-
-  // ==================== TIME DISPLAY ====================
-  // Date object ko screen par "07:00 AM" format mein show karna
+  /* ==================== TIME DISPLAY ==================== */
 
   const displayTime = date => {
 
@@ -126,38 +297,36 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   };
 
-
-  // ==================== TIME CONVERSION ====================
-  // Selected time ko MySQL ke "HH:MM:SS" format mein convert karna
+  /* ==================== TIME CONVERSION ==================== */
 
   const formatTimeForMySQL = date => {
 
     return date.toTimeString().slice(0, 8);
 
   };
+/* ==================== CHECK MINIMUM 1 HOUR ==================== */
 
+const isMinimumOneHour = () => {
+  const fromMinutes =
+    fromTime.getHours() * 60 + fromTime.getMinutes();
 
-  const toggleDay = day => {
+  const toMinutes =
+    toTime.getHours() * 60 + toTime.getMinutes();
 
-    if (selectedDays.includes(day)) {
+  const difference = toMinutes - fromMinutes;
 
-      setSelectedDays(
-        selectedDays.filter(item => item !== day),
-      );
-
-    } else {
-
-      setSelectedDays([...selectedDays, day]);
-
-    }
-
-  };
-
+  return difference >= 60;
+};
+  /* ==================== DROPDOWN ==================== */
 
   const openDropdown = (type, data) => {
-    setModal({type, data});
-  };
 
+    setModal({
+      type,
+      data,
+    });
+
+  };
 
   const selectValue = value => {
 
@@ -165,29 +334,13 @@ export default function NewSubscriptionScreen({navigation, route}) {
       setServiceType(value);
     }
 
-    if (modal.type === 'milkType') {
-      setMilkType(value);
-    }
-
-    if (modal.type === 'quantity') {
-      setQuantity(value);
-    }
-
-    if (modal.type === 'language') {
-      setLanguage(value);
-    }
-
-    if (modal.type === 'newspaper') {
-      setNewspaper(value);
-    }
-
     if (modal.type === 'radius') {
       setRadius(value);
     }
 
     setModal(null);
-  };
 
+  };
 
   const renderDropdown = (
     label,
@@ -198,7 +351,6 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
     return (
       <>
-
         <Text style={styles.label}>
           {label}
         </Text>
@@ -219,15 +371,12 @@ export default function NewSubscriptionScreen({navigation, route}) {
           </Text>
 
         </TouchableOpacity>
-
       </>
     );
 
   };
 
-
-  // ==================== START DATE PICKER ====================
-  // User jab Start Date select karega to ye function chalega
+  /* ==================== START DATE PICKER ==================== */
 
   const handleDateChange = (
     event,
@@ -242,9 +391,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   };
 
-
-  // ==================== FROM TIME PICKER ====================
-  // From time spinner se selected time save karna
+  /* ==================== FROM TIME PICKER ==================== */
 
   const handleFromTimeChange = (
     event,
@@ -259,9 +406,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   };
 
-
-  // ==================== TO TIME PICKER ====================
-  // To time spinner se selected time save karna
+  /* ==================== TO TIME PICKER ==================== */
 
   const handleToTimeChange = (
     event,
@@ -276,17 +421,83 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   };
 
-
-  // ==================== FIND PROVIDERS DATA ====================
-  // Find Providers press hone par subscription ki information
-  // SelectProvider screen ko bhej rahe hain
+  /* ==================== FIND PROVIDERS ==================== */
 
   const handleFindProviders = () => {
 
-    navigation.navigate('SelectProvider', {
+  /* ==================== MINIMUM 1 HOUR VALIDATION ==================== */
 
-      // ==================== RESIDENT ID ====================
-      // Resident ki ID next screen ko bhej rahe hain
+  if (!isMinimumOneHour()) {
+    Alert.alert(
+      'Invalid Time',
+      'Please select at least 1 hour of service time.'
+    );
+    return;
+  }
+
+  
+
+    /* ==================== SERVICE GROUPS FOR SEARCH ==================== */
+    /* Only days and products are sent. Quantities are not used for searching. */
+
+    const serviceGroupsForSearch = serviceGroups.map(group => {
+
+      let products = [];
+
+      if (serviceType === 'Milkman') {
+        products = group.products;
+      }
+
+      if (serviceType === 'Newspaper') {
+        products = group.newspapers;
+      }
+
+      return {
+        days: group.days,
+        products: products,
+      };
+
+    });
+
+    /* ==================== FULL SERVICE GROUPS ==================== */
+    /* Har group ke days, items aur quantity ServiceRequestItem mein save karne ke liye
+       alag se tayyar kar rahe hain. Search wala serviceGroupsForSearch unchanged hai. */
+
+    const requestServiceGroups = serviceGroups.map(group => {
+
+      let items = [];
+
+      if (serviceType === 'Milkman') {
+        items = group.products.map(product => ({
+          item_name: product,
+          quantity: group.quantities[product],
+        }));
+      }
+
+      if (serviceType === 'Newspaper') {
+        items = group.newspapers.map(newspaper => ({
+          item_name: newspaper,
+          quantity: group.newspaperQuantities[newspaper],
+        }));
+      }
+
+      if (serviceType === 'Garbage Collector') {
+        items = [
+          {
+            item_name: 'Garbage',
+            quantity: group.garbageQuantity,
+          },
+        ];
+      }
+
+      return {
+        days: group.days,
+        items: items,
+      };
+
+    });
+
+    navigation.navigate('SelectProvider', {
 
       residentId: residentId,
 
@@ -294,10 +505,12 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
       startDate: startDate,
 
-      selectedDays: selectedDays,
+      serviceGroups: serviceGroupsForSearch,
 
-      // ==================== MYSQL TIME ====================
-      // Date object ko "HH:MM:SS" format mein convert karke bhej rahe hain
+      /* ==================== FULL SERVICE GROUPS ==================== */
+      /* Full service groups (days + items + quantity) next screen tak pass kar rahe hain */
+
+      requestServiceGroups: requestServiceGroups,
 
       fromTime: formatTimeForMySQL(fromTime),
 
@@ -309,11 +522,356 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   };
 
+  /* ==================== RENDER SERVICE GROUP ==================== */
+
+  const renderServiceGroup = (group, index) => {
+
+    return (
+
+        <View key={group.id} style={styles.serviceCard}>
+
+          {/* ==================== CARD HEADER ==================== */}
+
+          <View style={styles.cardHeader}>
+
+            <View style={styles.groupNumber}>
+
+              <Text style={styles.groupNumberText}>
+                {index + 1}
+              </Text>
+
+            </View>
+
+            <Text style={styles.groupTitle}>
+              Service Group {index + 1}
+            </Text>
+
+          </View>
+
+          {/* ==================== SELECT DAYS ==================== */}
+
+          <Text style={styles.cardLabel}>
+            SELECT DAYS *
+          </Text>
+
+          <View style={styles.daysContainer}>
+
+            {groupDayButtons.map(item => (
+
+              <TouchableOpacity
+                key={item.day}
+                style={[
+                  styles.cardDay,
+                  group.days.includes(item.day) &&
+                    styles.cardDaySelected,
+                ]}
+                onPress={() =>
+                  toggleGroupDay(group, item.day)
+                }
+              >
+
+                <Text
+                  style={[
+                    styles.cardDayText,
+                    group.days.includes(item.day) &&
+                      styles.cardDayTextSelected,
+                  ]}
+                >
+                  {item.short}
+                </Text>
+
+              </TouchableOpacity>
+
+            ))}
+
+          </View>
+
+          {/* ==================== MILKMAN SECTION ==================== */}
+
+          {serviceType === 'Milkman' && (
+            <>
+
+              {/* ==================== MILK PRODUCTS ==================== */}
+
+              <Text style={styles.cardLabel}>
+                MILK PRODUCTS *
+              </Text>
+
+              <View style={styles.productsContainer}>
+
+                {milkProductOptions.map(item => (
+
+                  <TouchableOpacity
+                    key={item.name}
+                    style={[
+                      styles.productButton,
+                      group.products.includes(item.name) &&
+                        styles.productButtonSelected,
+                    ]}
+                    onPress={() =>
+                      toggleGroupProduct(group, item.name)
+                    }
+                  >
+
+                    <Text
+                      style={[
+                        styles.productButtonText,
+                        group.products.includes(item.name) &&
+                          styles.productButtonTextSelected,
+                      ]}
+                    >
+                      {item.emoji} {item.name}
+                    </Text>
+
+                  </TouchableOpacity>
+
+                ))}
+
+              </View>
+
+              {/* ==================== QUANTITIES ==================== */}
+
+              {group.products.length > 0 && (
+
+                <View style={styles.quantitySection}>
+
+                  <Text style={styles.quantityTitle}>
+                    QUANTITIES
+                  </Text>
+
+                  {group.products.map(product => (
+
+                    <View
+                      key={product}
+                      style={styles.quantityRow}
+                    >
+
+                      <Text style={styles.quantityProduct}>
+
+                        {product === 'Cow Milk' && '🐄 '}
+                        {product === 'Goat Milk' && '🐐 '}
+                        {product === 'Camel Milk' && '🐪 '}
+                        {product === 'Cheese' && '🧀 '}
+                        {product === 'Ghee' && '🧈 '}
+
+                        {product}
+
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() =>
+                          changeQuantity(group, product, -1)
+                        }
+                      >
+
+                        <Text style={styles.quantityButtonText}>
+                          −
+                        </Text>
+
+                      </TouchableOpacity>
+
+                      <Text style={styles.quantityValue}>
+                        {group.quantities[product]}
+                        {getQuantityUnit(product)}
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() =>
+                          changeQuantity(group, product, 1)
+                        }
+                      >
+
+                        <Text style={styles.quantityButtonText}>
+                          +
+                        </Text>
+
+                      </TouchableOpacity>
+
+                    </View>
+
+                  ))}
+
+                </View>
+
+              )}
+
+            </>
+          )}
+
+          {/* ==================== NEWSPAPER SECTION ==================== */}
+
+          {serviceType === 'Newspaper' && (
+            <>
+
+              {/* ==================== NEWSPAPER PRODUCTS ==================== */}
+
+              <Text style={styles.cardLabel}>
+                NEWSPAPERS *
+              </Text>
+
+              <View style={styles.productsContainer}>
+
+                {newspaperOptions.map(newspaper => (
+
+                  <TouchableOpacity
+                    key={newspaper}
+                    style={[
+                      styles.productButton,
+                      group.newspapers.includes(newspaper) &&
+                        styles.productButtonSelected,
+                    ]}
+                    onPress={() =>
+                      toggleNewspaper(group, newspaper)
+                    }
+                  >
+
+                    <Text
+                      style={[
+                        styles.productButtonText,
+                        group.newspapers.includes(newspaper) &&
+                          styles.productButtonTextSelected,
+                      ]}
+                    >
+                      {newspaper}
+                    </Text>
+
+                  </TouchableOpacity>
+
+                ))}
+
+              </View>
+
+              {/* ==================== NEWSPAPER QUANTITY ==================== */}
+
+              {group.newspapers.length > 0 && (
+
+                <View style={styles.quantitySection}>
+
+                  <Text style={styles.quantityTitle}>
+                    QUANTITY
+                  </Text>
+
+                  {group.newspapers.map(newspaper => (
+
+                    <View
+                      key={newspaper}
+                      style={styles.quantityRow}
+                    >
+
+                      <Text style={styles.quantityProduct}>
+                        {newspaper}
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() =>
+                          changeNewspaperQuantity(group, newspaper, -1)
+                        }
+                      >
+
+                        <Text style={styles.quantityButtonText}>
+                          −
+                        </Text>
+
+                      </TouchableOpacity>
+
+                      <Text style={styles.quantityValue}>
+                        {group.newspaperQuantities[newspaper]}
+                        {group.newspaperQuantities[newspaper] === 1
+                          ? ' piece'
+                          : ' pieces'}
+                      </Text>
+
+                      <TouchableOpacity
+                        style={styles.quantityButton}
+                        onPress={() =>
+                          changeNewspaperQuantity(group, newspaper, 1)
+                        }
+                      >
+
+                        <Text style={styles.quantityButtonText}>
+                          +
+                        </Text>
+
+                      </TouchableOpacity>
+
+                    </View>
+
+                  ))}
+
+                </View>
+
+              )}
+
+            </>
+          )}
+
+          {/* ==================== GARBAGE SECTION ==================== */}
+
+          {serviceType === 'Garbage Collector' && (
+
+            <View style={styles.quantitySection}>
+
+              {/* ==================== GARBAGE QUANTITY ==================== */}
+
+              <Text style={styles.quantityTitle}>
+                GARBAGE QUANTITY
+              </Text>
+
+              <View style={styles.quantityRow}>
+
+                <Text style={styles.quantityProduct}>
+                  Garbage
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() =>
+                    changeGarbageQuantity(group, -1)
+                  }
+                >
+
+                  <Text style={styles.quantityButtonText}>
+                    −
+                  </Text>
+
+                </TouchableOpacity>
+
+                <Text style={styles.quantityValue}>
+                  {group.garbageQuantity} kg
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={() =>
+                    changeGarbageQuantity(group, 1)
+                  }
+                >
+
+                  <Text style={styles.quantityButtonText}>
+                    +
+                  </Text>
+
+                </TouchableOpacity>
+
+              </View>
+
+            </View>
+
+          )}
+
+        </View>
+
+    );
+
+  };
 
   return (
     <SafeAreaView style={styles.container}>
 
-      {/* Header */}
+      {/* ==================== HEADER ==================== */}
 
       <View style={styles.header}>
 
@@ -329,23 +887,20 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
         </TouchableOpacity>
 
-
         <Text style={styles.headerTitle}>
           New Subscription
         </Text>
 
-
         <View style={{width: 25}} />
 
       </View>
-
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.content}
       >
 
-        {/* Service Type */}
+        {/* ==================== SERVICE TYPE ==================== */}
 
         {renderDropdown(
           'Service Type',
@@ -354,71 +909,15 @@ export default function NewSubscriptionScreen({navigation, route}) {
           serviceTypes,
         )}
 
-
         <Text style={styles.helper}>
           Only visitors offering this service will be shown.
         </Text>
 
-
-        {/* Milkman */}
-
-        {serviceType === 'Milkman' && (
-
-          <>
-
-            {renderDropdown(
-              'Milk Type',
-              milkType,
-              'milkType',
-              milkTypes,
-            )}
-
-
-            {renderDropdown(
-              'Quantity (Liters)',
-              quantity,
-              'quantity',
-              quantities,
-            )}
-
-          </>
-
-        )}
-
-
-        {/* Newspaper */}
-
-        {serviceType === 'Newspaper' && (
-
-          <>
-
-            {renderDropdown(
-              'Newspaper Language',
-              language,
-              'language',
-              languages,
-            )}
-
-
-            {renderDropdown(
-              'Newspaper',
-              newspaper,
-              'newspaper',
-              newspapers,
-            )}
-
-          </>
-
-        )}
-
-
         {/* ==================== START DATE ==================== */}
-        {/* Yahan Start Date par click karne se Date Picker open hoga */}
 
         <Text style={styles.label}>
           Start Date
         </Text>
-
 
         <TouchableOpacity
           style={styles.input}
@@ -431,16 +930,11 @@ export default function NewSubscriptionScreen({navigation, route}) {
             📅
           </Text>
 
-
           <Text style={styles.inputText}>
             {startDate.toLocaleDateString('en-GB')}
           </Text>
 
         </TouchableOpacity>
-
-
-        {/* ==================== START DATE PICKER ==================== */}
-        {/* Actual Start Date Picker yahan display hota hai */}
 
         {showDatePicker && (
 
@@ -453,75 +947,40 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
         )}
 
+        {/* ==================== SERVICE GROUP CARDS ==================== */}
 
-        {/* Weekly Schedule */}
+        {serviceGroups.map((group, index) =>
+          renderServiceGroup(group, index)
+        )}
 
-        <Text style={styles.label}>
-          Weekly Schedule
-        </Text>
+        {/* ==================== ADD ANOTHER DAY GROUP ==================== */}
 
+        <TouchableOpacity
+          style={styles.addGroupButton}
+          onPress={addServiceGroup}
+        >
 
-        <View style={styles.scheduleBox}>
+          <Text style={styles.addGroupText}>
+            + Add Another Day Group
+          </Text>
 
-          {days.map(day => (
-
-            <TouchableOpacity
-              key={day}
-              style={styles.dayRow}
-              onPress={() =>
-                toggleDay(day)
-              }
-            >
-
-              <View
-                style={[
-                  styles.checkbox,
-                  selectedDays.includes(day) &&
-                    styles.checked,
-                ]}
-              >
-
-                {selectedDays.includes(day) && (
-
-                  <Text style={styles.tick}>
-                    ✓
-                  </Text>
-
-                )}
-
-              </View>
-
-
-              <Text style={styles.dayText}>
-                {day}
-              </Text>
-
-            </TouchableOpacity>
-
-          ))}
-
-        </View>
-
+        </TouchableOpacity>
 
         {/* ==================== TIME SLOT ==================== */}
-        {/* Resident ke From aur To time ke liye scrollable spinner */}
 
         <Text style={styles.label}>
           Time Slot
         </Text>
 
-
         <View style={styles.timeRow}>
 
           {/* ==================== FROM TIME ==================== */}
-          {/* From Time par click karne se scrollable time picker open hoga */}
 
           <View style={styles.timeColumn}>
 
             <Text style={styles.smallLabel}>
               From
             </Text>
-
 
             <TouchableOpacity
               style={styles.timeInput}
@@ -538,21 +997,17 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
           </View>
 
-
           <Text style={styles.toText}>
             to
           </Text>
 
-
           {/* ==================== TO TIME ==================== */}
-          {/* To Time par click karne se scrollable time picker open hoga */}
 
           <View style={styles.timeColumn}>
 
             <Text style={styles.smallLabel}>
               To
             </Text>
-
 
             <TouchableOpacity
               style={styles.timeInput}
@@ -571,9 +1026,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
         </View>
 
-
         {/* ==================== FROM TIME PICKER ==================== */}
-        {/* Visitor Signup jaisa spinner From Time ke liye */}
 
         {showFromTimePicker && (
 
@@ -587,9 +1040,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
         )}
 
-
         {/* ==================== TO TIME PICKER ==================== */}
-        {/* Visitor Signup jaisa spinner To Time ke liye */}
 
         {showToTimePicker && (
 
@@ -603,8 +1054,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
         )}
 
-
-        {/* Provider Radius */}
+        {/* ==================== PROVIDER RADIUS ==================== */}
 
         {renderDropdown(
           'Provider Radius',
@@ -618,15 +1068,12 @@ export default function NewSubscriptionScreen({navigation, route}) {
           ],
         )}
 
-
         <Text style={styles.helper}>
           Providers within this distance from your home
           location will be shown.
         </Text>
 
-
-        {/* ==================== FIND PROVIDERS BUTTON ==================== */}
-        {/* Selected subscription data ko SelectProvider screen ko bhejna */}
+        {/* ==================== FIND PROVIDERS ==================== */}
 
         <TouchableOpacity
           style={styles.findButton}
@@ -641,9 +1088,7 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
       </ScrollView>
 
-
       {/* ==================== DROPDOWN MODAL ==================== */}
-      {/* Service, Milk, Newspaper aur Radius selection ka modal */}
 
       <Modal
         visible={modal !== null}
@@ -668,7 +1113,6 @@ export default function NewSubscriptionScreen({navigation, route}) {
               Select
             </Text>
 
-
             <FlatList
               data={
                 modal
@@ -676,7 +1120,6 @@ export default function NewSubscriptionScreen({navigation, route}) {
                   : []
               }
               keyExtractor={item => item}
-
               renderItem={({
                 item,
               }) => (
@@ -692,7 +1135,6 @@ export default function NewSubscriptionScreen({navigation, route}) {
                     {item}
                   </Text>
 
-
                   <Text style={styles.modalArrow}>
                     ›
                   </Text>
@@ -700,7 +1142,6 @@ export default function NewSubscriptionScreen({navigation, route}) {
                 </TouchableOpacity>
 
               )}
-
             />
 
           </View>
@@ -713,14 +1154,205 @@ export default function NewSubscriptionScreen({navigation, route}) {
   );
 }
 
-
 const styles = StyleSheet.create({
+
+ /* ==================== SERVICE GROUP CARD ==================== */
+
+  serviceCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9DEE7',
+    borderRadius: 14,
+    padding: 12,
+    marginTop: 15,
+  },
+
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  groupNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#2463EB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+
+  groupNumberText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  groupTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#374151',
+  },
+
+  /* ==================== ADD GROUP BUTTON ==================== */
+
+  addGroupButton: {
+    height: 46,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#2463EB',
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+  },
+
+  addGroupText: {
+    color: '#2463EB',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  /* ==================== CARD LABEL ==================== */
+
+  cardLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 7,
+    marginTop: 8,
+  },
+
+  /* ==================== CARD DAYS ==================== */
+
+  daysContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+
+  cardDay: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9DEE7',
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  cardDayText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  /* ==================== SELECTED DAY ==================== */
+
+  cardDaySelected: {
+    backgroundColor: '#2463EB',
+    borderWidth: 1,
+    borderColor: '#2463EB',
+  },
+
+  cardDayTextSelected: {
+    color: '#FFFFFF',
+  },
+
+  /* ==================== PRODUCTS ==================== */
+
+  productsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 7,
+  },
+
+  productButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#D9DEE7',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+
+  productButtonText: {
+    color: '#6B7280',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
+  /* ==================== SELECTED PRODUCT ==================== */
+
+  productButtonSelected: {
+    backgroundColor: '#2463EB',
+    borderWidth: 1,
+    borderColor: '#2463EB',
+  },
+
+  productButtonTextSelected: {
+    color: '#FFFFFF',
+  },
+
+  /* ==================== QUANTITY SECTION ==================== */
+
+  quantitySection: {
+    marginTop: 15,
+  },
+
+  quantityTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 7,
+  },
+
+  quantityRow: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#D9DEE7',
+    borderRadius: 12,
+    minHeight: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    marginBottom: 7,
+  },
+
+  quantityProduct: {
+    flex: 1,
+    fontSize: 12,
+    color: '#374151',
+  },
+
+  quantityButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 9,
+    backgroundColor: '#E8F0FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  quantityButtonText: {
+    fontSize: 18,
+    color: '#2463EB',
+    fontWeight: '600',
+  },
+
+  quantityValue: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#374151',
+    marginHorizontal: 14,
+  },
+
+  /* ==================== MAIN SCREEN ==================== */
 
   container: {
     flex: 1,
     backgroundColor: '#F5F6FA',
   },
-
 
   header: {
     height: 60,
@@ -733,12 +1365,10 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
 
-
   back: {
     fontSize: 25,
     color: '#374151',
   },
-
 
   headerTitle: {
     fontSize: 17,
@@ -746,12 +1376,12 @@ const styles = StyleSheet.create({
     color: '#111827',
   },
 
-
   content: {
     padding: 20,
     paddingBottom: 40,
   },
 
+  /* ==================== LABELS ==================== */
 
   label: {
     fontSize: 13,
@@ -761,13 +1391,13 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
 
-
   helper: {
     fontSize: 11,
     color: '#7B8494',
     marginTop: 3,
   },
 
+  /* ==================== DROPDOWN ==================== */
 
   dropdown: {
     height: 48,
@@ -781,18 +1411,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-
   dropdownText: {
     fontSize: 14,
     color: '#1F2937',
   },
-
 
   arrow: {
     fontSize: 12,
     color: '#111827',
   },
 
+  /* ==================== START DATE ==================== */
 
   input: {
     height: 48,
@@ -805,89 +1434,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 
-
   calendar: {
     fontSize: 15,
     marginRight: 10,
   },
-
 
   inputText: {
     fontSize: 14,
     color: '#374151',
   },
 
-
-  scheduleBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D9DEE7',
-    borderRadius: 12,
-    padding: 10,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-
-
-  dayRow: {
-    width: '50%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-
-
-  checkbox: {
-    width: 16,
-    height: 16,
-    borderWidth: 1,
-    borderColor: '#AAB1BD',
-    borderRadius: 2,
-    marginRight: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-
-  checked: {
-    backgroundColor: '#2463EB',
-    borderColor: '#2463EB',
-  },
-
-
-  tick: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-
-
-  dayText: {
-    fontSize: 12,
-    color: '#374151',
-  },
-
-
-  // ==================== TIME SLOT STYLE ====================
-  // From aur To time boxes ka design
+  /* ==================== TIME SLOT ==================== */
 
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
 
-
   timeColumn: {
     flex: 1,
   },
-
 
   smallLabel: {
     fontSize: 12,
     color: '#6B7280',
     marginBottom: 5,
   },
-
 
   timeInput: {
     height: 48,
@@ -899,12 +1471,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-
   timeText: {
     fontSize: 14,
     color: '#374151',
   },
-
 
   toText: {
     marginHorizontal: 8,
@@ -912,6 +1482,7 @@ const styles = StyleSheet.create({
     marginTop: 18,
   },
 
+  /* ==================== FIND PROVIDERS ==================== */
 
   findButton: {
     height: 50,
@@ -922,20 +1493,19 @@ const styles = StyleSheet.create({
     marginTop: 28,
   },
 
-
   findText: {
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '700',
   },
 
+  /* ==================== DROPDOWN MODAL ==================== */
 
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'flex-end',
   },
-
 
   modalBox: {
     backgroundColor: '#FFFFFF',
@@ -945,14 +1515,12 @@ const styles = StyleSheet.create({
     maxHeight: '55%',
   },
 
-
   modalTitle: {
     fontSize: 17,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 10,
   },
-
 
   modalItem: {
     height: 50,
@@ -963,12 +1531,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
 
-
   modalItemText: {
     fontSize: 14,
     color: '#374151',
   },
-
 
   modalArrow: {
     fontSize: 20,

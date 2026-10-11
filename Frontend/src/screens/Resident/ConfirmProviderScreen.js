@@ -114,6 +114,11 @@ export default function BookingSummaryScreen({navigation, route}) {
     'Sunday',
   ];
 
+  /* ==================== SERVICE GROUPS DATA ==================== */
+  /* SelectProvider se aane wale service groups (days + items + quantity) */
+
+  const serviceGroups = data.serviceGroups || [];
+
   const fromTime = data.fromTime || '07:00:00';
   const toTime = data.toTime || '08:00:00';
 
@@ -188,6 +193,11 @@ export default function BookingSummaryScreen({navigation, route}) {
             // ==================== SELECTED DAYS ====================
             // Resident ke selected weekly days
             selectedDays: selectedDays,
+
+
+            /* ==================== SERVICE GROUPS ==================== */
+            /* Har group ke days, items aur quantity ServiceRequestItem mein save hongi */
+            serviceGroups: serviceGroups,
 
 
             // ==================== FROM TIME ====================

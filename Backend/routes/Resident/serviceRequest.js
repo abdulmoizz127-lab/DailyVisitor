@@ -22,6 +22,7 @@ router.post('/service-request', (req, res) => {
     serviceType,
     startDate,
     selectedDays,
+    serviceGroups,
     fromTime,
     toTime,
   } = req.body;
@@ -43,6 +44,79 @@ router.post('/service-request', (req, res) => {
     return res.status(400).json({
       message: 'Required request data is missing',
     });
+  }
+
+
+  /* ==================== SERVICE GROUPS CHECK ==================== */
+  /* Service groups zaroori hain taake har group ServiceRequestItem mein save ho sake */
+
+  if (
+    !Array.isArray(serviceGroups) ||
+    serviceGroups.length === 0
+  ) {
+
+    return res.status(400).json({
+      message: 'Service groups are missing',
+    });
+  }
+
+
+  /* ==================== PREPARE SERVICE REQUEST ITEMS ==================== */
+  /* Har group ke har item ki alag row banai ja rahi hai.
+     selected_days us specific group ke days hain, overall selectedDays nahi.
+     request_id insert ke baad lagayi jayegi. */
+
+  const weekOrder = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  const itemRows = [];
+
+  for (const group of serviceGroups) {
+
+    const groupDays = weekOrder.filter(day =>
+      Array.isArray(group.days) && group.days.includes(day)
+    );
+
+    if (groupDays.length === 0) {
+
+      return res.status(400).json({
+        message: 'Every service group must have days selected',
+      });
+    }
+
+    if (!Array.isArray(group.items) || group.items.length === 0) {
+
+      return res.status(400).json({
+        message: 'Every service group must have at least one item',
+      });
+    }
+
+    for (const item of group.items) {
+
+      const quantity = Number(item.quantity);
+
+      if (!item.item_name || !(quantity > 0)) {
+
+        return res.status(400).json({
+          message: 'Every item must have a name and a valid quantity',
+        });
+      }
+
+      itemRows.push([
+        groupDays.join(','),
+        item.item_name,
+        quantity,
+      ]);
+
+    }
+
   }
 
 
@@ -144,18 +218,78 @@ router.post('/service-request', (req, res) => {
           );
 
 
-          return res.status(201).json({
+          /* ==================== SAVE SERVICE REQUEST ITEMS ==================== */
+          /* Service groups ko ServiceRequestItem table mein save kar rahe hain.
+             Har row mein naya request_id lagaya ja raha hai. */
 
-            message: 'Service request sent successfully',
+          const requestId = insertResult.insertId;
 
-            // ==================== REQUEST ID ====================
-            // Newly created request ki ID frontend ko return kar rahe hain
-            requestId: insertResult.insertId,
+          const itemValues = itemRows.map(row => [
+            requestId,
+            row[0],
+            row[1],
+            row[2],
+          ]);
 
-            // ==================== REQUEST STATUS ====================
-            // Initial request status PENDING hai
-            status: 'PENDING',
-          });
+          const insertItemsSQL = `
+            INSERT INTO ServiceRequestItem
+            (
+              request_id,
+              selected_days,
+              item_name,
+              quantity
+            )
+            VALUES ?
+          `;
+
+
+          db.query(
+            insertItemsSQL,
+            [itemValues],
+            (itemsError) => {
+
+              if (itemsError) {
+
+                console.log(
+                  'Service request items insert error:',
+                  itemsError.message
+                );
+
+                /* ==================== REMOVE INCOMPLETE REQUEST ==================== */
+                /* Items save na hon to adhoori request delete kar dete hain */
+
+                db.query(
+                  'DELETE FROM ServiceRequest WHERE request_id = ?',
+                  [requestId],
+                  () => {
+
+                    return res.status(500).json({
+                      message: 'Request could not be saved',
+                    });
+
+                  }
+                );
+
+                return;
+              }
+
+
+              return res.status(201).json({
+
+                message: 'Service request sent successfully',
+
+                // ==================== REQUEST ID ====================
+                // Newly created request ki ID frontend ko return kar rahe hain
+                requestId: requestId,
+
+                // ==================== REQUEST STATUS ====================
+                // Initial request status PENDING hai
+                status: 'PENDING',
+              });
+
+            }
+          );
+
         }
       );
     }

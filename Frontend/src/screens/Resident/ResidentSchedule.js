@@ -15,8 +15,8 @@ const subscriptions = [
     id: 1,
     service: 'Milk Delivery',
     provider: 'Ali Jahanzaib',
-    days: 'Monday, Tuesday',
-    time: '07:00 AM - 08:00 AM',
+    days: 'Monday, Tuesday,Wednesday, Thursday,Friday, Saturday, Sunday',
+    time: '07:00 AM - 07:30 AM',
   },
 
   {
@@ -37,7 +37,66 @@ const subscriptions = [
 ];
 
 
-export default function ResidentSchedule({navigation}) {
+// CHANGED: Component now receives "route" as well, so it can read the userId and name sent from other Resident screens
+export default function ResidentSchedule({navigation, route}) {
+
+  // CHANGED: Resident id and name received from other Resident screens (same param names Home uses)
+  const residentId = route?.params?.userId;
+  const residentNameParam = route?.params?.name;
+
+  // CHANGED: Go back to the already mounted ResidentHome when it is the previous screen,
+  // so its service cards and params stay intact. Otherwise navigate to ResidentHome and
+  // send userId/name (only when available) so Home can still load its services.
+  const goHome = () => {
+    const navState = navigation.getState();
+    const previousRoute = navState?.routes?.[navState.index - 1];
+
+    if (navState?.type === 'stack' && previousRoute?.name === 'ResidentHome') {
+      navigation.goBack();
+      return;
+    }
+
+    const homeParams = {};
+
+    if (residentId) {
+      homeParams.userId = residentId;
+    }
+
+    if (residentNameParam) {
+      homeParams.name = residentNameParam;
+    }
+
+    navigation.navigate({
+      name: 'ResidentHome',
+      params: homeParams,
+      merge: true,
+    });
+  };
+
+  // CHANGED: Activity tab now sends userId and name to ResidentActivity
+  const goActivity = () => {
+    navigation.navigate('ResidentActivity', {
+      userId: residentId,
+      name: residentNameParam,
+    });
+  };
+
+  // CHANGED: Profile tab now opens the RESIDENT profile (route "ResidentProfile").
+  // The old code used "Profile", which App.js registers as the Visitor Profile screen.
+  const goProfile = () => {
+    navigation.navigate('ResidentProfile', {
+      userId: residentId,
+      name: residentNameParam,
+    });
+  };
+
+  // CHANGED: Plus button now opens "NewSubscription" with residentId, like ResidentHome.
+  // The old route "FindProvider" is not registered in App.js.
+  const handlePlusPress = () => {
+    navigation.navigate('NewSubscription', {
+      residentId: residentId,
+    });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -62,7 +121,11 @@ export default function ResidentSchedule({navigation}) {
 
 
         {/* ADDED: Out of Station section */}
-        <TouchableOpacity style={styles.outStation}>
+       {/* CHANGED: Out of Station screen open karne ke liye navigation add ki */}
+<TouchableOpacity
+  style={styles.outStation}
+  onPress={() => navigation.navigate('ResidentOutOfStation')}
+>
 
           <Text style={styles.warningIcon}>
             ⚠️
@@ -97,10 +160,14 @@ export default function ResidentSchedule({navigation}) {
         {subscriptions.map((item) => (
 
           <TouchableOpacity
-            key={item.id}
-            style={styles.card}
-            activeOpacity={0.85}
-          >
+             key={item.id}
+             style={styles.card}
+             activeOpacity={0.85}
+             onPress={() =>
+  navigation.navigate('VisitorRecord')
+             
+           }
+         >
 
             {/* Service name and status */}
             <View style={styles.cardTop}>
@@ -175,9 +242,10 @@ export default function ResidentSchedule({navigation}) {
 
 
       {/* Floating + Button */}
+      {/* CHANGED: Plus button uses handlePlusPress (registered route + residentId) */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('FindProvider')}
+        onPress={handlePlusPress}
       >
         <Text style={styles.fabText}>
           +
@@ -189,9 +257,10 @@ export default function ResidentSchedule({navigation}) {
       <View style={styles.bottomNav}>
 
         {/* Home */}
+        {/* CHANGED: Home tab uses goHome (keeps Home cards and sends userId/name when needed) */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => navigation.navigate('ResidentHome')}
+          onPress={goHome}
         >
           <Text style={styles.navIcon}>
             🏠
@@ -204,9 +273,10 @@ export default function ResidentSchedule({navigation}) {
 
 
         {/* Activity */}
+        {/* CHANGED: Activity tab uses goActivity (sends userId and name) */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => navigation.navigate('ResidentActivity')}
+          onPress={goActivity}
         >
           <Text style={styles.navIcon}>
             🕐
@@ -237,9 +307,10 @@ export default function ResidentSchedule({navigation}) {
 
 
         {/* Profile */}
+        {/* CHANGED: Profile tab uses goProfile, which opens ResidentProfile instead of the Visitor "Profile" route */}
         <TouchableOpacity
           style={styles.navItem}
-          onPress={() => navigation.navigate('Profile')}
+          onPress={goProfile}
         >
           <Text style={styles.navIcon}>
             👤

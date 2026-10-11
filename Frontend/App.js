@@ -9,8 +9,10 @@ import LocationScreen from './src/screens/LocationScreen';
 import VisitorLogin from './src/screens/Visitor/VisitorLogin';
 import VisitorSignup from './src/screens/Visitor/VisitorSignup';
 import VisitorHome from './src/screens/Visitor/VisitorHome';
+import VisitorActivity from './src/screens/Visitor/VisitorActivity';
 import ScheduleScreen from './src/screens/Visitor/ScheduleScreen';
 import VisitorNotification from './src/screens/Visitor/VisitorNotification';
+import Profile from './src/screens/Visitor/Profile';
 
 import ResidentLogin from './src/screens/Resident/ResidentLogin';
 import ResidentSignup from './src/screens/Resident/ResidentSignup';
@@ -19,6 +21,13 @@ import ResidentActivity from './src/screens/Resident/ResidentActivity';
 import NewSubscriptionScreen from './src/screens/Resident/NewSubscriptionScreen';
 import SelectProviderScreen from './src/screens/Resident/SelectProviderScreen';
 import ConfirmProviderScreen from './src/screens/Resident/ConfirmProviderScreen';
+import ResidentSchedule from './src/screens/Resident/ResidentSchedule';
+import ResidentOutOfStation from './src/screens/Resident/ResidentOutOfStation';
+import ChooseNeighbour from './src/screens/Resident/ChooseNeighbour';
+import ResidentOutOfStationSuccess from './src/screens/Resident/ResidentOutOfStationSuccess';
+import VisitorRecord from './src/screens/Resident/VisitorRecord';
+import ResidentProfile from './src/screens/Resident/ResidentProfile';
+import ResidentRecord from './src/screens/Visitor/ResidentRecord';
 import ResidentNotification from './src/screens/Resident/ResidentNotification';
 
 const Stack = createNativeStackNavigator();
@@ -76,10 +85,37 @@ function App() {
           />
 
           <Stack.Screen
+            name="ResidentSchedule"
+           component={ResidentSchedule}
+          />
+
+          <Stack.Screen
+            name="ResidentOutOfStation"
+            component={ResidentOutOfStation}
+          />
+          <Stack.Screen
+           name="ChooseNeighbour"
+           component={ChooseNeighbour}
+          />
+
+          <Stack.Screen
+           name="ResidentOutOfStationSuccess"
+           component={ResidentOutOfStationSuccess}
+          />
+
+          <Stack.Screen
+           name="VisitorRecord"
+           component={VisitorRecord}
+          />
+
+          <Stack.Screen
             name="ResidentNotification"
             component={ResidentNotification}
           />
-
+          <Stack.Screen
+            name="ResidentProfile"
+            component={ResidentProfile}
+          />
           <Stack.Screen
             name="VisitorLogin"
             component={VisitorLogin}
@@ -93,15 +129,25 @@ function App() {
              name="VisitorHome"
              component={VisitorHome}
           />
-
+          <Stack.Screen
+            name="VisitorActivity"
+            component={VisitorActivity}
+          />
            <Stack.Screen
               name="Schedule"
               component={ScheduleScreen}
            />
-
+           <Stack.Screen
+              name="ResidentRecord"
+              component={ResidentRecord}
+           />
            <Stack.Screen
               name="VisitorNotification"
               component={VisitorNotification}
+           />
+           <Stack.Screen
+            name="Profile"
+            component={Profile}
            />
         </Stack.Navigator>
 

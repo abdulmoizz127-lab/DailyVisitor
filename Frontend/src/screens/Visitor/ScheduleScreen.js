@@ -40,7 +40,14 @@ const services = [
 ];
 
 
-export default function ScheduleScreen() {
+// MODIFIED: route add kiya taake Home/Activity/Profile se aane wale userId aur name read ho sakein
+export default function ScheduleScreen({navigation, route}) {
+
+  // ADDED: Visitor ka userId, taake wapas Home bhejne par cards dobara load ho sakein
+  const visitorUserId = route.params?.userId;
+
+  // ADDED: Visitor ka name, taake wapas Home bhejne par greeting sahi dikhe
+  const visitorName = route.params?.name;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -109,9 +116,12 @@ export default function ScheduleScreen() {
 
         {services.map(item => (
 
-          <View
+          // CHANGED: Service card ko clickable banaya
+          // ResidentRecord screen par navigate karne ke liye
+          <TouchableOpacity
             key={item.id}
             style={styles.card}
+            onPress={() => navigation.navigate('ResidentRecord')}
           >
 
             <View style={styles.cardHeader}>
@@ -165,7 +175,7 @@ export default function ScheduleScreen() {
 
             </View>
 
-          </View>
+          </TouchableOpacity>
 
         ))}
 
@@ -174,9 +184,22 @@ export default function ScheduleScreen() {
 
       {/* Bottom Navigation */}
 
+      {/* MODIFIED: Bottom navigation ab baqi Visitor screens jaisi chaar tabs hain,
+          wahi order: Home, Activity, Schedule, Profile. Purana Services tab remove kar diya
+          kyunke App.js mein 'Services' naam ka koi route registered nahi hai. */}
       <View style={styles.bottom}>
 
-        <TouchableOpacity style={styles.tab}>
+        {/* MODIFIED: Home tab ka onPress pehle missing tha. Route 'VisitorHome' App.js mein registered hai.
+            userId aur name wapas bhej rahe hain taake VisitorHome accepted services dobara fetch kar sake. */}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() =>
+            navigation.navigate('VisitorHome', {
+              userId: visitorUserId,
+              name: visitorName,
+            })
+          }
+        >
           <Text style={styles.icon}>
             🏠
           </Text>
@@ -187,6 +210,30 @@ export default function ScheduleScreen() {
         </TouchableOpacity>
 
 
+        {/* ADDED: Activity tab, second position par (Services ki jagah ka order theek karne ke liye).
+            Route 'VisitorActivity' App.js mein registered hai.
+            userId aur name bhej rahe hain taake Activity se wapas Home aane par cards load hon. */}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() =>
+            navigation.navigate('VisitorActivity', {
+              userId: visitorUserId,
+              name: visitorName,
+            })
+          }
+        >
+          <Text style={styles.icon}>
+            ◉
+          </Text>
+
+          <Text style={styles.tabText}>
+            Activity
+          </Text>
+        </TouchableOpacity>
+
+
+        {/* MODIFIED: Schedule tab ab third position par hai aur current screen hai
+            (isliye iska onPress nahi hai, highlighted box pehle jaisa hi hai) */}
         <TouchableOpacity style={styles.tab}>
 
           <View style={styles.activeIcon}>
@@ -202,21 +249,18 @@ export default function ScheduleScreen() {
         </TouchableOpacity>
 
 
-        <TouchableOpacity style={styles.tab}>
-
-          <Text style={styles.icon}>
-            💼
-          </Text>
-
-          <Text style={styles.tabText}>
-            Services
-          </Text>
-
-        </TouchableOpacity>
-
-
-
-        <TouchableOpacity style={styles.tab}>
+        {/* MODIFIED: Profile tab ka onPress pehle missing tha.
+            Route 'Profile' App.js mein registered hai (Visitor Profile, ResidentProfile nahi).
+            userId aur name bhej rahe hain taake Profile se wapas Home aane par cards load hon. */}
+        <TouchableOpacity
+          style={styles.tab}
+          onPress={() =>
+            navigation.navigate('Profile', {
+              userId: visitorUserId,
+              name: visitorName,
+            })
+          }
+        >
 
           <Text style={styles.icon}>
             👤

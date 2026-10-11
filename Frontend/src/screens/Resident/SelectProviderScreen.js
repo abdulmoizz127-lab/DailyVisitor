@@ -41,7 +41,17 @@ export default function SelectProviderScreen({navigation, route}) {
   // NewSubscriptionScreen se subscription ki information receive kar rahe hain
   const serviceType = route.params?.serviceType;
   const startDate = route.params?.startDate;
-  const selectedDays = route.params?.selectedDays || [];
+
+  /* ==================== RECEIVING SERVICE GROUPS ==================== */
+
+  const serviceGroups = route.params?.serviceGroups || [];
+
+  /* ==================== RECEIVING FULL SERVICE GROUPS ==================== */
+  /* Full service groups (days + items + quantity) jo request save karne ke liye hain.
+     Provider search mein yeh use nahi hote. */
+
+  const requestServiceGroups = route.params?.requestServiceGroups || [];
+
   const fromTime = route.params?.fromTime;
   const toTime = route.params?.toTime;
   const radius = route.params?.radius;
@@ -57,12 +67,13 @@ export default function SelectProviderScreen({navigation, route}) {
       setLoading(true);
 
 
-      // ==================== REQUIRED DATA CHECK ====================
-      // API call se pehle required data check kar rahe hain
+      /* ==================== REQUIRED DATA CHECK ==================== */
+      /* API call se pehle required data check kar rahe hain */
+
       if (
         !residentId ||
         !serviceType ||
-        selectedDays.length === 0 ||
+        serviceGroups.length === 0 ||
         !fromTime ||
         !toTime ||
         !radius
@@ -90,10 +101,13 @@ export default function SelectProviderScreen({navigation, route}) {
             'Content-Type': 'application/json',
           },
 
+          /* ==================== API REQUEST BODY ==================== */
+
           body: JSON.stringify({
             residentId: residentId,
             serviceType: serviceType,
-            selectedDays: selectedDays,
+            serviceGroups: serviceGroups,
+            startDate: startDate,
             fromTime: fromTime,
             toTime: toTime,
             radius: radius,
@@ -121,8 +135,9 @@ export default function SelectProviderScreen({navigation, route}) {
       }
 
 
-      // ==================== SAVE PROVIDERS ====================
-      // Backend se providers ke saath price aur price unit bhi receive hogi
+      /* ==================== SAVE PROVIDERS ==================== */
+      /* Backend se providers ke saath unki saari prices (prices array) bhi receive hongi */
+
       setProviders(data.providers || []);
 
     } catch (error) {
@@ -195,6 +210,25 @@ export default function SelectProviderScreen({navigation, route}) {
     }
 
 
+    /* ==================== SELECTED DAYS FOR CONFIRMATION ==================== */
+    /* All service group days ko combine karke duplicate days remove kar rahe hain.
+       Days week ki tarteeb (Monday se Sunday) mein rakhe gaye hain */
+
+    const weekOrder = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+
+    const selectedDays = weekOrder.filter(day =>
+      serviceGroups.some(group => (group.days || []).includes(day))
+    );
+
+
     // ==================== NAVIGATE TO CONFIRM PROVIDER ====================
     // Selected provider aur subscription data next screen ko bhej rahe hain
     navigation.navigate('ConfirmProvider', {
@@ -219,16 +253,21 @@ export default function SelectProviderScreen({navigation, route}) {
       // Selected provider ki service next screen ko bhej rahe hain
       serviceType: selectedProvider.service,
 
-      // ==================== PROVIDER PRICE ====================
-      // Selected provider ki price next screen ko bhej rahe hain
-      servicePrice: selectedProvider.service_price,
+      /* ==================== PROVIDER PRICES ==================== */
+      /* Selected provider ki complete price list next screen ko bhej rahe hain */
 
-      // ==================== PROVIDER PRICE UNIT ====================
-      // Selected provider ki price unit next screen ko bhej rahe hain
-      priceUnit: selectedProvider.price_unit,
+      prices: selectedProvider.prices,
 
-      // ==================== SUBSCRIPTION DATA ====================
+      /* ==================== SUBSCRIPTION DATA ==================== */
+
       startDate: startDate,
+
+      /* ==================== FULL SERVICE GROUPS ==================== */
+      /* ConfirmProvider ko search wale groups ki jagah full groups bhej rahe hain,
+         taake wahan se backend ko days + items + quantity mil sakein. */
+
+      serviceGroups: requestServiceGroups,
+
       selectedDays: selectedDays,
       fromTime: fromTime,
       toTime: toTime,
@@ -384,19 +423,30 @@ export default function SelectProviderScreen({navigation, route}) {
                     </Text>
 
 
-                    {/* ==================== PROVIDER PRICE ==================== */}
-                    {/* Backend se aayi provider ki actual signup price show kar rahe hain */}
-                    <View style={styles.detailRow}>
+                    {/* ==================== SERVICES & PRICES ==================== */}
 
-                      <Text style={styles.detailIcon}>
-                        💰
-                      </Text>
+                    <Text style={styles.pricesTitle}>
+                      SERVICES & PRICES
+                    </Text>
 
-                      <Text style={styles.priceText}>
-                        Rs. {provider.service_price} / {provider.price_unit}
-                      </Text>
+                    {(provider.prices || []).map(item => (
 
-                    </View>
+                      <View
+                        key={item.item_name}
+                        style={styles.priceRow}
+                      >
+
+                        <Text style={styles.priceItemName}>
+                          {item.display_name}
+                        </Text>
+
+                        <Text style={styles.priceText}>
+                          Rs. {item.price} / {item.price_unit}
+                        </Text>
+
+                      </View>
+
+                    ))}
 
 
                     {/* ==================== PROVIDER DISTANCE ==================== */}
@@ -646,6 +696,31 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 3,
     marginBottom: 7,
+  },
+
+
+  /* ==================== SERVICES & PRICES ==================== */
+
+  pricesTitle: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#6B7280',
+    marginBottom: 4,
+  },
+
+
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 3,
+    marginBottom: 3,
+  },
+
+
+  priceItemName: {
+    fontSize: 12,
+    color: '#374151',
   },
 
 

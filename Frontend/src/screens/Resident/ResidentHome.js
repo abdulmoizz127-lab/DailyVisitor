@@ -1,6 +1,9 @@
 // ==================== REACT IMPORT ====================
 // React aur screen lifecycle ke liye import kar rahe hain
-import React, {useEffect, useState} from 'react';
+// CHANGED: Added useRef and useCallback (resident id fallback + focus fetch)
+// and useFocusEffect from React Navigation (refresh services whenever Home becomes active again)
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 
 import {
   SafeAreaView,
@@ -23,8 +26,20 @@ export default function ResidentHome({navigation, route}) {
 
   // ==================== RESIDENT ID ====================
   // ResidentLogin se aane wala userId receive kar rahe hain
-  const residentId =
+  // CHANGED: Remember the last valid userId so that a return to Home without params
+  // can never turn residentId into undefined and stop the services request
+  const paramResidentId =
     route.params?.userId;
+
+  const lastResidentIdRef =
+    useRef(paramResidentId);
+
+  if (paramResidentId) {
+    lastResidentIdRef.current = paramResidentId;
+  }
+
+  const residentId =
+    paramResidentId || lastResidentIdRef.current;
 
 
   // ==================== ACCEPTED SERVICES STATE ====================
@@ -52,69 +67,94 @@ export default function ResidentHome({navigation, route}) {
 
 
   // ==================== FETCH ACCEPTED SERVICES ====================
-  // Resident Home open hone par backend se accepted services fetch kar rahe hain
-  useEffect(() => {
+  // CHANGED: useEffect replaced by useFocusEffect. It runs on first open AND every time
+  // Resident Home becomes active again (for example after coming back from Profile).
+  // Same endpoint and same response handling as before. "loading" is only true on the
+  // very first load, so later refreshes update the cards silently without clearing them.
+  useFocusEffect(
+    useCallback(() => {
 
-    // ==================== CHECK RESIDENT ID ====================
-    // Agar residentId available nahi hai to API call nahi karenge
-    if (!residentId) {
-      setLoading(false);
-      return;
-    }
-
-
-    // ==================== CALL RESIDENT HOME API ====================
-    // Backend se resident ki accepted service requests le rahe hain
-    fetch(
-      `http://localhost:5000/api/residents/accepted-services/${residentId}`,
-    )
-      .then(response => response.json())
-
-
-      // ==================== PROCESS API RESPONSE ====================
-      // Backend se received services ko state mein save kar rahe hain
-      .then(data => {
-
-        console.log(
-          'Resident Home services:',
-          data,
-        );
-
-
-        // ==================== SAVE ACCEPTED SERVICES ====================
-        // Backend se accepted services frontend state mein save kar rahe hain
-        if (data.services) {
-          setAcceptedServices(data.services);
-        } else {
-          setAcceptedServices([]);
-        }
-      })
-
-
-      // ==================== API ERROR ====================
-      // Agar API call fail ho jaye to error console mein show karenge
-      .catch(error => {
-
-        console.log(
-          'Resident Home API error:',
-          error,
-        );
-
-
-        Alert.alert(
-          'Error',
-          'Services could not be loaded.',
-        );
-      })
-
-
-      // ==================== STOP LOADING ====================
-      // API request complete hone ke baad loading false karenge
-      .finally(() => {
+      // ==================== CHECK RESIDENT ID ====================
+      // Agar residentId available nahi hai to API call nahi karenge
+      if (!residentId) {
         setLoading(false);
-      });
+        return undefined;
+      }
 
-  }, [residentId]);
+
+      // CHANGED: Ignore a response that arrives after the screen lost focus or residentId changed
+      let isActive = true;
+
+
+      // ==================== CALL RESIDENT HOME API ====================
+      // Backend se resident ki accepted service requests le rahe hain
+      fetch(
+        `http://localhost:5000/api/residents/accepted-services/${residentId}`,
+      )
+        .then(response => response.json())
+
+
+        // ==================== PROCESS API RESPONSE ====================
+        // Backend se received services ko state mein save kar rahe hain
+        .then(data => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log(
+            'Resident Home services:',
+            data,
+          );
+
+
+          // ==================== SAVE ACCEPTED SERVICES ====================
+          // Backend se accepted services frontend state mein save kar rahe hain
+          if (data.services) {
+            setAcceptedServices(data.services);
+          } else {
+            setAcceptedServices([]);
+          }
+        })
+
+
+        // ==================== API ERROR ====================
+        // CHANGED: On error the existing cards are kept (state is not cleared)
+        .catch(error => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log(
+            'Resident Home API error:',
+            error,
+          );
+
+
+          Alert.alert(
+            'Error',
+            'Services could not be loaded.',
+          );
+        })
+
+
+        // ==================== STOP LOADING ====================
+        // API request complete hone ke baad loading false karenge
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+
+      // CHANGED: Cleanup runs when Home loses focus or residentId changes
+      return () => {
+        isActive = false;
+      };
+
+    }, [residentId]),
+  );
 
 
   // ==================== GET SERVICE DAYS ====================
@@ -441,6 +481,31 @@ export default function ResidentHome({navigation, route}) {
       getInitials(providerName);
 
 
+    /* ==================== SERVICE ITEMS FOR SELECTED DAY ==================== */
+    /* Backend se aane wale service.items mein se sirf selected day ke items le rahe hain.
+       Agar service.items na ho to empty array use hoga, is se error nahi aayega. */
+
+    const serviceItems =
+      (service.items || []).filter(item => {
+
+        if (
+          !selectedDay ||
+          !item.selected_days
+        ) {
+          return true;
+        }
+
+        return String(item.selected_days)
+          .split(',')
+          .map(day =>
+            day.trim().toLowerCase(),
+          )
+          .includes(
+            selectedDay.toLowerCase(),
+          );
+      });
+
+
     return (
 
       // ==================== DYNAMIC SERVICE CARD ====================
@@ -496,6 +561,28 @@ export default function ResidentHome({navigation, route}) {
           </Text>
 
         </View>
+
+
+        {/* ==================== SERVICE ITEMS AND QUANTITIES ==================== */}
+        {/* Resident ke selected items aur un ki quantity show kar rahe hain */}
+        {serviceItems.length > 0 && (
+
+          <View style={styles.itemsContainer}>
+
+            {serviceItems.map((item, index) => (
+
+              <Text
+                key={`${item.item_name}-${index}`}
+                style={styles.itemText}
+              >
+                {item.item_name} - {item.quantity}
+              </Text>
+
+            ))}
+
+          </View>
+
+        )}
 
 
         {/* ==================== SERVICE DATE AND TIME ==================== */}
@@ -722,9 +809,14 @@ export default function ResidentHome({navigation, route}) {
 
         <TouchableOpacity
           style={styles.tab}
+          // CHANGED: Send userId and name to ResidentActivity so it can return to Home without losing them
           onPress={() =>
             navigation.navigate(
               'ResidentActivity',
+              {
+                userId: residentId,
+                name: residentName,
+              },
             )
           }
         >
@@ -750,10 +842,13 @@ export default function ResidentHome({navigation, route}) {
 
         <TouchableOpacity
           style={styles.tab}
+           // CHANGED: Resident Schedule screen navigation
+          // CHANGED: Send userId and name to ResidentSchedule as well, for consistent navigation
           onPress={() =>
-            navigation.navigate(
-              'Schedule',
-            )
+            navigation.navigate('ResidentSchedule', {
+              userId: residentId,
+              name: residentName,
+            })
           }
         >
 
@@ -772,11 +867,14 @@ export default function ResidentHome({navigation, route}) {
 
         <TouchableOpacity
           style={styles.tab}
+          // CHANGED: Send userId and name to ResidentProfile so its Plus button and Home tab keep working
           onPress={() =>
-            navigation.navigate(
-              'Profile',
-            )
+            navigation.navigate('ResidentProfile', {
+              userId: residentId,
+              name: residentName,
+            })
           }
+          
         >
 
           <Text style={styles.icon}>
@@ -1005,6 +1103,22 @@ const styles = StyleSheet.create({
   arrow: {
     fontSize: 22,
     color: '#9CA3AF',
+  },
+
+
+  /* ==================== SERVICE ITEMS CONTAINER ==================== */
+  /* Items aur quantities ki list ke liye spacing */
+  itemsContainer: {
+    marginBottom: 12,
+  },
+
+
+  /* ==================== SERVICE ITEM TEXT ==================== */
+  /* Har item ka naam aur quantity ka text */
+  itemText: {
+    fontSize: 13,
+    color: '#374151',
+    marginBottom: 3,
   },
 
 
