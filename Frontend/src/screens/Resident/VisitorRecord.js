@@ -49,19 +49,19 @@ export default function VisitorRecord({navigation}) {
             <View style={styles.profileInfo}>
 
               <Text style={styles.profileName}>
-                Ali Jahanzaib
+                SIR MUNIR
               </Text>
 
               <Text style={styles.profileTime}>
-                ⭐ 4.8  •  🕐 07:00 AM - 07:30 AM
+                ⭐ 4.8  •  🕐 12:00 PM - 1:30 PM
               </Text>
 
               <Text style={styles.profileAddress}>
-                Sitara Market
+               📍 Dhoke Paracha, Metropolitan Corporation Rawalpindi, Punjab
               </Text>
 
               <Text style={styles.profileSince}>
-                Active since Jan 1, 2026
+                Active since 1 Oct, 2026
               </Text>
 
             </View>

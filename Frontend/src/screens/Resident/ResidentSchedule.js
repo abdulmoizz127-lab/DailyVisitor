@@ -1,4 +1,9 @@
-import React from 'react';
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Added useCallback/useState and useFocusEffect (same pattern as ResidentHome)
+   so the subscriptions are loaded from the backend and refreshed whenever
+   this screen becomes active again. */
+import React, {useCallback, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 import {
   View,
   Text,
@@ -9,32 +14,132 @@ import {
 } from 'react-native';
 
 
-// CHANGED: Sirf 3 active services ka simple dummy data
-const subscriptions = [
-  {
-    id: 1,
-    service: 'Milk Delivery',
-    provider: 'Ali Jahanzaib',
-    days: 'Monday, Tuesday,Wednesday, Thursday,Friday, Saturday, Sunday',
-    time: '07:00 AM - 07:30 AM',
-  },
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* The 3 hardcoded dummy subscriptions were removed. Real data now comes from
+   GET /api/residents/accepted-services/:residentId (same endpoint ResidentHome uses). */
 
-  {
-    id: 2,
-    service: 'Newspaper',
-    provider: 'Abdul Moiz',
-    days: 'Wednesday, Thursday',
-    time: '07:30 AM - 08:30 AM',
-  },
-
-  {
-    id: 3,
-    service: 'Garbage',
-    provider: 'Muhammad Jan',
-    days: 'Friday, Saturday, Sunday',
-    time: '08:00 AM - 09:00 AM',
-  },
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Week order used to sort the service days of a subscription */
+const weekOrder = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
 ];
+
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Database service name -> name shown on the Schedule card */
+const formatServiceName = service => {
+
+  if (service === 'Milkman') {
+    return 'Milk Delivery';
+  }
+
+  if (service === 'Newspaper') {
+    return 'Newspaper';
+  }
+
+  if (service === 'Garbage Collector') {
+    return 'Garbage';
+  }
+
+  return service || 'Service';
+};
+
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Database TIME (HH:mm:ss) -> 12-hour AM/PM text. Returns '' if unavailable.
+   00:00:00 becomes 12:00 AM, so the 11 PM slot shows as 11:00 PM - 12:00 AM. */
+const formatTime = time => {
+
+  if (!time) {
+    return '';
+  }
+
+  const parts = String(time).split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+
+  if (Number.isNaN(hours) || minutes === undefined) {
+    return '';
+  }
+
+  const hour24 = hours % 24;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const displayHour = hour24 % 12 === 0 ? 12 : hour24 % 12;
+
+  return `${displayHour}:${minutes.slice(0, 2)} ${period}`;
+};
+
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Builds "6:00 AM – 7:00 AM". If the end time is missing only the start is
+   shown; if the start time is missing nothing is shown. */
+const formatTimeRange = (fromTime, toTime) => {
+
+  const start = formatTime(fromTime);
+  const end = formatTime(toTime);
+
+  if (!start) {
+    return '';
+  }
+
+  return end ? `${start} – ${end}` : start;
+};
+
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* Collects all service days of ONE subscription into a single text.
+   Uses selected_days of the request; falls back to the days of its items. */
+const getServiceDays = service => {
+
+  let source = service.selected_days;
+
+  if (!source && Array.isArray(service.items)) {
+    source = service.items
+      .map(item => item.selected_days)
+      .filter(Boolean)
+      .join(',');
+  }
+
+  if (!source) {
+    return '';
+  }
+
+  const days = [];
+
+  String(source)
+    .split(',')
+    .map(day => day.trim())
+    .filter(Boolean)
+    .forEach(day => {
+
+      const match = weekOrder.find(
+        weekDay => weekDay.toLowerCase() === day.toLowerCase(),
+      );
+
+      const dayName = match || day;
+
+      if (!days.includes(dayName)) {
+        days.push(dayName);
+      }
+    });
+
+  const dayIndex = day => {
+    const index = weekOrder.indexOf(day);
+    return index === -1 ? weekOrder.length : index;
+  };
+
+  days.sort((a, b) => dayIndex(a) - dayIndex(b));
+
+  return days.join(', ');
+};
+
+/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+/* A subscription is active only when the backend status confirms it.
+   The backend currently returns only ACCEPTED requests. */
+const isActiveSubscription = service =>
+  String(service?.status || '').toUpperCase() === 'ACCEPTED';
 
 
 // CHANGED: Component now receives "route" as well, so it can read the userId and name sent from other Resident screens
@@ -43,6 +148,101 @@ export default function ResidentSchedule({navigation, route}) {
   // CHANGED: Resident id and name received from other Resident screens (same param names Home uses)
   const residentId = route?.params?.userId;
   const residentNameParam = route?.params?.name;
+
+
+  /* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+  /* Subscriptions loaded from the backend, loading flag, error message and a
+     reload counter used by the Retry button */
+  const [subscriptions, setSubscriptions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+
+  /* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+  /* Loads the active subscriptions of this resident only (residentId in the URL).
+     Runs on first open, on every focus and when Retry is pressed. */
+  useFocusEffect(
+    useCallback(() => {
+
+      if (!residentId) {
+        setSubscriptions([]);
+        setError('Resident information is missing. Please go back and try again.');
+        setLoading(false);
+        return undefined;
+      }
+
+      // Ignore a response that arrives after the screen lost focus or residentId changed
+      let isActive = true;
+
+      fetch(
+        `http://localhost:5000/api/residents/accepted-services/${residentId}`,
+      )
+        .then(response =>
+          response
+            .json()
+            .catch(() => null)
+            .then(data => {
+
+              if (!response.ok) {
+                throw new Error(
+                  (data && data.message) || 'Server error',
+                );
+              }
+
+              return data;
+            }),
+        )
+        .then(data => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log('Resident Schedule subscriptions:', data);
+
+          const services =
+            data && Array.isArray(data.services)
+              ? data.services
+              : [];
+
+          setSubscriptions(services.filter(isActiveSubscription));
+          setError('');
+        })
+        .catch(apiError => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log('Resident Schedule API error:', apiError);
+
+          setError(
+            'Active subscriptions could not be loaded. Please check your connection and try again.',
+          );
+        })
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
+
+    }, [residentId, reloadKey]),
+  );
+
+
+  /* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+  /* Retry button: shows the loading message again and reloads the subscriptions */
+  const handleRetry = () => {
+    setError('');
+    setLoading(true);
+    setReloadKey(key => key + 1);
+  };
+
 
   // CHANGED: Go back to the already mounted ResidentHome when it is the previous screen,
   // so its service cards and params stay intact. Otherwise navigate to ResidentHome and
@@ -156,16 +356,69 @@ export default function ResidentSchedule({navigation, route}) {
         </Text>
 
 
-        {/* CHANGED: Simple subscription cards */}
-        {subscriptions.map((item) => (
+        {/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */}
+        {/* Loading message while the subscriptions are being fetched */}
+        {loading && (
+          <Text style={styles.statusText}>
+            Loading subscriptions...
+          </Text>
+        )}
+
+
+        {/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */}
+        {/* Error message with Retry button when the request fails */}
+        {!loading && error !== '' && (
+
+          <View style={styles.errorBox}>
+
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={handleRetry}
+            >
+
+              <Text style={styles.retryText}>
+                Retry
+              </Text>
+
+            </TouchableOpacity>
+
+          </View>
+
+        )}
+
+
+        {/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */}
+        {/* Empty state when the resident has no active subscriptions */}
+        {!loading && error === '' && subscriptions.length === 0 && (
+          <Text style={styles.statusText}>
+            No active subscriptions yet.
+          </Text>
+        )}
+
+
+        {/* ==================== ACTIVE SUBSCRIPTIONS API ==================== */}
+        {/* One card per active subscription (ServiceRequest). All days of the
+            subscription are shown together in the same card. */}
+        {!loading && subscriptions.map((item, index) => {
+
+          const serviceName = formatServiceName(item.service);
+          const providerName = item.provider_name || 'Service Provider';
+          const serviceDays = getServiceDays(item);
+          const serviceTime = formatTimeRange(item.from_time, item.to_time);
+
+          return (
 
           <TouchableOpacity
-             key={item.id}
+             key={item.request_id || index}
              style={styles.card}
              activeOpacity={0.85}
              onPress={() =>
   navigation.navigate('VisitorRecord')
-             
+
            }
          >
 
@@ -183,7 +436,7 @@ export default function ResidentSchedule({navigation, route}) {
                 <View style={styles.nameRow}>
 
                   <Text style={styles.serviceName}>
-                    {item.service}
+                    {serviceName}
                   </Text>
 
                   <Text style={styles.active}>
@@ -197,7 +450,7 @@ export default function ResidentSchedule({navigation, route}) {
                 </View>
 
                 <Text style={styles.provider}>
-                  {item.provider}
+                  {providerName}
                 </Text>
 
               </View>
@@ -206,35 +459,45 @@ export default function ResidentSchedule({navigation, route}) {
 
 
             {/* Service days */}
-            <View style={styles.detailRow}>
+            {serviceDays !== '' && (
 
-              <Text style={styles.detailIcon}>
-                📅
-              </Text>
+              <View style={styles.detailRow}>
 
-              <Text style={styles.detailText}>
-                {item.days}
-              </Text>
+                <Text style={styles.detailIcon}>
+                  📅
+                </Text>
 
-            </View>
+                <Text style={styles.detailText}>
+                  {serviceDays}
+                </Text>
+
+              </View>
+
+            )}
 
 
             {/* Service time */}
-            <View style={styles.detailRow}>
+            {serviceTime !== '' && (
 
-              <Text style={styles.detailIcon}>
-                🕐
-              </Text>
+              <View style={styles.detailRow}>
 
-              <Text style={styles.time}>
-                {item.time}
-              </Text>
+                <Text style={styles.detailIcon}>
+                  🕐
+                </Text>
 
-            </View>
+                <Text style={styles.time}>
+                  {serviceTime}
+                </Text>
+
+              </View>
+
+            )}
 
           </TouchableOpacity>
 
-        ))}
+          );
+
+        })}
 
         <View style={{height: 100}} />
 
@@ -413,6 +676,56 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 12,
+  },
+
+
+  /* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+  /* Loading / empty message */
+  statusText: {
+    textAlign: 'center',
+    marginTop: 30,
+    fontSize: 15,
+    color: '#6B7280',
+  },
+
+
+  /* ==================== ACTIVE SUBSCRIPTIONS API ==================== */
+  /* Error message box and Retry button */
+  errorBox: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 14,
+
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+
+  errorText: {
+    fontSize: 13,
+    color: '#B91C1C',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+  retryButton: {
+    backgroundColor: '#2D52E6',
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 26,
+  },
+
+  retryText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: 'bold',
   },
 
 

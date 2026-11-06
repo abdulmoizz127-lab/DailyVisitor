@@ -286,13 +286,14 @@ export default function VisitorSignup({navigation, route}) {
   // Provider ke service days
 
   const weekDays = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday', // Added: Sunday service day
+];
 
 
   // ==================== SELECT MAIN SERVICE ====================
@@ -486,14 +487,17 @@ export default function VisitorSignup({navigation, route}) {
     if (days.includes(day)) {
 
 
-      setDays(
-        days.filter(item => item !== day)
-      );
+      /* ==================== KEEP A SELECTED DAY AFTER REMOVAL ==================== */
+
+      const remainingDays = days.filter(item => item !== day);
+
+
+      setDays(remainingDays);
 
 
       if (selectedDay === day) {
 
-        setSelectedDay('');
+        setSelectedDay(remainingDays[0] || '');
 
       }
 
@@ -801,14 +805,20 @@ export default function VisitorSignup({navigation, route}) {
     }
 
 
-    // ==================== CHECK SERVICE TIME ====================
-    // Provider ne kam az kam ek time slot add kiya hai ya nahi
+    /* ==================== CHECK TIME SLOT FOR EVERY SELECTED DAY ==================== */
 
-    if (Object.keys(timeSlots).length === 0) {
+    const dayWithoutSlot = weekDays.find(
+      day =>
+        days.includes(day) &&
+        !(timeSlots[day] && timeSlots[day].length > 0)
+    );
+
+
+    if (dayWithoutSlot) {
 
       Alert.alert(
         'Time Required',
-        'Please add a service time.'
+        'Please add at least one time slot for ' + dayWithoutSlot + '.'
       );
 
 

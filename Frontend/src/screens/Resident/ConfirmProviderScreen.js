@@ -222,8 +222,13 @@ export default function BookingSummaryScreen({navigation, route}) {
       // ==================== CHECK API RESPONSE ====================
       if (!response.ok) {
 
+        /* ==================== DUPLICATE REQUEST MESSAGE ==================== */
+        /* Backend 409 bheje to clear title ke saath wahi message dikhate hain */
+
         Alert.alert(
-          'Request Failed',
+          response.status === 409
+            ? 'Request Already Sent'
+            : 'Request Failed',
           responseData.message || 'Request send nahi ho saki.'
         );
 

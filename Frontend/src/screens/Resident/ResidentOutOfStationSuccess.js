@@ -29,7 +29,7 @@ export default function ResidentOutOfStationSuccess({navigation}) {
 
         <View style={styles.dateBox}>
           <Text style={styles.redText}>Out of Station Days</Text>
-          <Text style={styles.dateText}>25 Sept</Text>
+          <Text style={styles.dateText}>2 Nov</Text>
         </View>
 
         <View style={styles.card}>
@@ -46,9 +46,9 @@ export default function ResidentOutOfStationSuccess({navigation}) {
 
             <View style={styles.info}>
               <Text style={styles.name}>Milk Delivery</Text>
-              <Text style={styles.provider}>Ali Jahanzaib</Text>
+              <Text style={styles.provider}>SIR MUNIR</Text>
               <Text style={styles.neighbour}>
-                Sana Khan - 0333-9876543
+                Sana Khan - 0321-333333
               </Text>
             </View>
 

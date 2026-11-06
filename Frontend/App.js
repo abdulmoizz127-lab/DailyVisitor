@@ -27,6 +27,7 @@ import ChooseNeighbour from './src/screens/Resident/ChooseNeighbour';
 import ResidentOutOfStationSuccess from './src/screens/Resident/ResidentOutOfStationSuccess';
 import VisitorRecord from './src/screens/Resident/VisitorRecord';
 import ResidentProfile from './src/screens/Resident/ResidentProfile';
+import AddAlternate from './src/screens/Resident/AddAlternate';
 import ResidentRecord from './src/screens/Visitor/ResidentRecord';
 import ResidentNotification from './src/screens/Resident/ResidentNotification';
 
@@ -116,6 +117,10 @@ function App() {
             name="ResidentProfile"
             component={ResidentProfile}
           />
+          <Stack.Screen
+  name="AddAlternate"
+  component={AddAlternate}
+/>
           <Stack.Screen
             name="VisitorLogin"
             component={VisitorLogin}

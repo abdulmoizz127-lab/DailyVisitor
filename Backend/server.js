@@ -24,6 +24,10 @@ const residentNotification = require('./routes/Resident/ResidentNotification');
 app.use('/api/residents', residentNotification);
 const residentHome = require('./routes/Resident/ResidentHome');
 app.use('/api/residents', residentHome);
+const nearbyResidents = require('./routes/Resident/nearbyResidents');
+app.use('/api/residents', nearbyResidents);
+const alternateRequests = require('./routes/Resident/alternateRequests');
+app.use('/api/residents', alternateRequests);
 
 // Visitor routes
 const visitorSignup = require('./routes/Visitor/visitorSignup');

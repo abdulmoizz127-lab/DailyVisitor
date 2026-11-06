@@ -161,6 +161,55 @@ router.post('/service-request', (req, res) => {
       const serviceId = serviceResults[0].service_id;
 
 
+      /* ==================== BLOCK DUPLICATE REQUEST ==================== */
+      /* Resident ki is provider ko pehle se koi PENDING ya ACCEPTED request
+         ho to nayi request block hoti hai (time ya day change karne se bhi nahi).
+         REJECTED request ke baad dobara request bheji ja sakti hai.
+         Dusre providers ko requests allowed hain. */
+
+      const duplicateSQL = `
+        SELECT request_id, status
+        FROM ServiceRequest
+        WHERE resident_id = ?
+          AND provider_id = ?
+          AND UPPER(status) IN ('PENDING', 'ACCEPTED')
+        LIMIT 1
+      `;
+
+
+      db.query(
+        duplicateSQL,
+        [residentId, providerId],
+        (duplicateError, duplicateResults) => {
+
+      if (duplicateError) {
+
+        console.log(
+          'Duplicate request check error:',
+          duplicateError.message
+        );
+
+        return res.status(500).json({
+          message: 'Server error',
+        });
+      }
+
+
+      if (duplicateResults.length > 0) {
+
+        const existingStatus =
+          String(duplicateResults[0].status).toUpperCase();
+
+        return res.status(409).json({
+          code: 'DUPLICATE_REQUEST',
+          message:
+            existingStatus === 'ACCEPTED'
+              ? 'This provider has already accepted your request. You cannot send another request to the same provider.'
+              : 'You have already sent a request to this provider and it is still pending. Please wait for the provider to respond.',
+        });
+      }
+
+
       // ==================== SELECTED DAYS FOR DATABASE ====================
       // Array ko comma-separated text mein convert kar rahe hain
       const selectedDaysText = selectedDays.join(',');
@@ -289,6 +338,9 @@ router.post('/service-request', (req, res) => {
 
             }
           );
+
+        }
+      );
 
         }
       );

@@ -845,11 +845,24 @@ router.get('/accepted-services/:userId', (req, res) => {
             }
 
 
-            // ==================== CREATE SERVICE DAYS ARRAY ====================
-            // Database ke result se sirf day names ka simple array bana rahe hain
-            const serviceDays = daysResults.map(
-              item => item.day
-            );
+            /* ==================== SORT SERVICE DAYS MONDAY TO SUNDAY ==================== */
+            const weekOrder = [
+              'Monday',
+              'Tuesday',
+              'Wednesday',
+              'Thursday',
+              'Friday',
+              'Saturday',
+              'Sunday'
+            ];
+
+
+            const serviceDays = daysResults
+              .map(item => item.day)
+              .sort(
+                (a, b) =>
+                  weekOrder.indexOf(a) - weekOrder.indexOf(b)
+              );
 
 
             // ==================== LOG PROVIDER SERVICE DAYS ====================

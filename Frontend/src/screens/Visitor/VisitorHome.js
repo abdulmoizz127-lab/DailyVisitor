@@ -368,6 +368,19 @@ const currentTask =
     ? todayServices[0]
     : null;
 
+// ==================== TIMELINE SERVICES (ADDED) ====================
+// ADDED: Agar Current Task maujood hai to us delivery ko Timeline se nikaal rahe hain (duplicate khatam).
+// Baqi deliveries todayServices ki existing sorting (from_time, to_time, route_order) mein hi rehti hain.
+// Agar Current Task nahi hai (future weekday) to Timeline mein selected day ki SAARI deliveries show hongi.
+// todayServices aur todayDeliveryCount (total count) change nahi hote.
+const timelineServices =
+  currentTask
+    ? todayServices.filter(
+        service =>
+          service.request_id !== currentTask.request_id,
+      )
+    : todayServices;
+
 
   // ==================== GET RESIDENT ADDRESS ====================
   // Resident ke address ke available parts ko combine kar rahe hain
@@ -782,11 +795,25 @@ const currentTask =
 
           )}
 
-{/* ==================== DYNAMIC SELECTED DAY TIMELINE ==================== */}
-{/* Selected day ki saari accepted deliveries automatically show kar rahe hain */}
+{/* ==================== NO MORE DELIVERIES (ADDED) ==================== */}
+{/* ADDED: Current Task maujood hai lekin us ke baad koi aur delivery nahi, to ye message show hoga */}
 
         {!loading &&
-          todayServices.map(
+          currentTask &&
+          timelineServices.length === 0 && (
+
+            <Text style={styles.emptyText}>
+              No more deliveries scheduled.
+            </Text>
+
+          )}
+
+{/* ==================== DYNAMIC SELECTED DAY TIMELINE ==================== */}
+{/* Selected day ki saari accepted deliveries automatically show kar rahe hain */}
+{/* CHANGED: todayServices ki jagah timelineServices (Current Task wali delivery is mein shamil nahi) */}
+
+        {!loading &&
+          timelineServices.map(
             (service, index) => (
 
               <View
@@ -796,10 +823,12 @@ const currentTask =
 
 {/* ==================== TIMELINE DOT ==================== */}
 {/* Current first task ko green aur baaki ko grey dot de rahe hain */}
+{/* CHANGED: Jab Current Task maujood ho to Timeline ki pehli delivery current nahi hoti, is liye green sirf
+    tab hai jab Current Task nahi hai (future day par pehle jaisa behavior) */}
 
                 <View
                   style={
-                    index === 0
+                    index === 0 && !currentTask
                       ? styles.timelineDotDone
                       : styles.timelineDot
                   }
@@ -821,10 +850,11 @@ const currentTask =
 
 {/* ==================== TIMELINE SERVICE ==================== */}
 {/* Actual service name show kar rahe hain */}
+{/* CHANGED: green "done" label bhi sirf tab jab Current Task nahi hai (dot jaisi hi condition) */}
 
                     <Text
                       style={
-                        index === 0
+                        index === 0 && !currentTask
                           ? styles.done
                           : styles.milk
                       }

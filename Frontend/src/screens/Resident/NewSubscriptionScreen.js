@@ -27,6 +27,26 @@ const radiusOptions = [
   '10 km',
 ];
 
+/* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+/* 24 hourly slots (12-hour AM/PM). Only the start hour is chosen;
+   the end hour is always start + 1 (wraps at midnight). */
+
+const formatHourLabel = hour => {
+  const h = hour % 24;
+  const suffix = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return `${h12}:00 ${suffix}`;
+};
+
+const timeSlotOptions = Array.from({length: 24}, (_, hour) => ({
+  hour: hour,
+  label: `${formatHourLabel(hour)} – ${formatHourLabel(hour + 1)}`,
+}));
+
+/* Converts an hour (0-24) to HH:mm:ss. 24 wraps to 00:00:00 (midnight). */
+const hourToMySQL = hour =>
+  `${String(hour % 24).padStart(2, '0')}:00:00`;
+
 /* ==================== GROUP DAY BUTTONS ==================== */
 
 const groupDayButtons = [
@@ -268,17 +288,15 @@ export default function NewSubscriptionScreen({navigation, route}) {
   const [showDatePicker, setShowDatePicker] =
     useState(false);
 
-  /* ==================== TIME PICKER ==================== */
+  /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+  /* Only the starting hour (0-23) is stored. null = not selected yet. */
 
-  const [fromTime, setFromTime] = useState(new Date());
+  const [selectedHour, setSelectedHour] = useState(null);
 
-  const [toTime, setToTime] = useState(new Date());
-
-  const [showFromTimePicker, setShowFromTimePicker] =
-    useState(false);
-
-  const [showToTimePicker, setShowToTimePicker] =
-    useState(false);
+  const selectedSlotLabel =
+  selectedHour == null || !timeSlotOptions[selectedHour]
+    ? 'Select Time Slot'
+    : timeSlotOptions[selectedHour].label;
 
   /* ==================== PROVIDER RADIUS ==================== */
 
@@ -286,37 +304,10 @@ export default function NewSubscriptionScreen({navigation, route}) {
 
   const [modal, setModal] = useState(null);
 
-  /* ==================== TIME DISPLAY ==================== */
+  /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+  /* displayTime, formatTimeForMySQL and isMinimumOneHour were removed:
+     slots are fixed to exactly one hour, so no duration check is needed. */
 
-  const displayTime = date => {
-
-    return date.toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-
-  };
-
-  /* ==================== TIME CONVERSION ==================== */
-
-  const formatTimeForMySQL = date => {
-
-    return date.toTimeString().slice(0, 8);
-
-  };
-/* ==================== CHECK MINIMUM 1 HOUR ==================== */
-
-const isMinimumOneHour = () => {
-  const fromMinutes =
-    fromTime.getHours() * 60 + fromTime.getMinutes();
-
-  const toMinutes =
-    toTime.getHours() * 60 + toTime.getMinutes();
-
-  const difference = toMinutes - fromMinutes;
-
-  return difference >= 60;
-};
   /* ==================== DROPDOWN ==================== */
 
   const openDropdown = (type, data) => {
@@ -336,6 +327,15 @@ const isMinimumOneHour = () => {
 
     if (modal.type === 'radius') {
       setRadius(value);
+    }
+
+    /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+
+    if (modal.type === 'timeSlot') {
+      const slot = timeSlotOptions.find(option => option.label === value);
+      if (slot) {
+        setSelectedHour(slot.hour);
+      }
     }
 
     setModal(null);
@@ -391,51 +391,23 @@ const isMinimumOneHour = () => {
 
   };
 
-  /* ==================== FROM TIME PICKER ==================== */
-
-  const handleFromTimeChange = (
-    event,
-    selectedTime,
-  ) => {
-
-    setShowFromTimePicker(false);
-
-    if (selectedTime) {
-      setFromTime(selectedTime);
-    }
-
-  };
-
-  /* ==================== TO TIME PICKER ==================== */
-
-  const handleToTimeChange = (
-    event,
-    selectedTime,
-  ) => {
-
-    setShowToTimePicker(false);
-
-    if (selectedTime) {
-      setToTime(selectedTime);
-    }
-
-  };
+  /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+  /* handleFromTimeChange and handleToTimeChange removed: the From/To
+     DateTimePickers no longer exist. */
 
   /* ==================== FIND PROVIDERS ==================== */
 
   const handleFindProviders = () => {
 
-  /* ==================== MINIMUM 1 HOUR VALIDATION ==================== */
+  /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
 
-  if (!isMinimumOneHour()) {
+  if (selectedHour === null) {
     Alert.alert(
-      'Invalid Time',
-      'Please select at least 1 hour of service time.'
+      'Select Time Slot',
+      'Please select a one-hour time slot.'
     );
     return;
   }
-
-  
 
     /* ==================== SERVICE GROUPS FOR SEARCH ==================== */
     /* Only days and products are sent. Quantities are not used for searching. */
@@ -512,9 +484,13 @@ const isMinimumOneHour = () => {
 
       requestServiceGroups: requestServiceGroups,
 
-      fromTime: formatTimeForMySQL(fromTime),
+      /* ==================== FIXED ONE-HOUR TIME SLOT ==================== */
+      /* Same param names and HH:mm:ss format as before.
+         11 PM slot => fromTime '23:00:00', toTime '00:00:00' */
 
-      toTime: formatTimeForMySQL(toTime),
+      fromTime: hourToMySQL(selectedHour),
+
+      toTime: hourToMySQL(selectedHour + 1),
 
       radius: radius,
 
@@ -966,93 +942,18 @@ const isMinimumOneHour = () => {
 
         </TouchableOpacity>
 
-        {/* ==================== TIME SLOT ==================== */}
+        {/* ==================== FIXED ONE-HOUR TIME SLOT ==================== */}
 
-        <Text style={styles.label}>
-          Time Slot
+        {renderDropdown(
+          'Select Time Slot',
+          selectedSlotLabel,
+          'timeSlot',
+          timeSlotOptions.map(option => option.label),
+        )}
+
+        <Text style={styles.helper}>
+          Every slot starts at :00 and lasts exactly one hour.
         </Text>
-
-        <View style={styles.timeRow}>
-
-          {/* ==================== FROM TIME ==================== */}
-
-          <View style={styles.timeColumn}>
-
-            <Text style={styles.smallLabel}>
-              From
-            </Text>
-
-            <TouchableOpacity
-              style={styles.timeInput}
-              onPress={() =>
-                setShowFromTimePicker(true)
-              }
-            >
-
-              <Text style={styles.timeText}>
-                {displayTime(fromTime)}
-              </Text>
-
-            </TouchableOpacity>
-
-          </View>
-
-          <Text style={styles.toText}>
-            to
-          </Text>
-
-          {/* ==================== TO TIME ==================== */}
-
-          <View style={styles.timeColumn}>
-
-            <Text style={styles.smallLabel}>
-              To
-            </Text>
-
-            <TouchableOpacity
-              style={styles.timeInput}
-              onPress={() =>
-                setShowToTimePicker(true)
-              }
-            >
-
-              <Text style={styles.timeText}>
-                {displayTime(toTime)}
-              </Text>
-
-            </TouchableOpacity>
-
-          </View>
-
-        </View>
-
-        {/* ==================== FROM TIME PICKER ==================== */}
-
-        {showFromTimePicker && (
-
-          <DateTimePicker
-            value={fromTime}
-            mode="time"
-            is24Hour={false}
-            display="spinner"
-            onChange={handleFromTimeChange}
-          />
-
-        )}
-
-        {/* ==================== TO TIME PICKER ==================== */}
-
-        {showToTimePicker && (
-
-          <DateTimePicker
-            value={toTime}
-            mode="time"
-            is24Hour={false}
-            display="spinner"
-            onChange={handleToTimeChange}
-          />
-
-        )}
 
         {/* ==================== PROVIDER RADIUS ==================== */}
 

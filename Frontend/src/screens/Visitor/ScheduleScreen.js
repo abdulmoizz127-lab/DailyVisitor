@@ -1,4 +1,8 @@
-import React from 'react';
+/* ==================== ACTIVE SERVICES API ==================== */
+/* useCallback/useState aur useFocusEffect add kiye (ResidentHome jaisa pattern),
+   taake accepted services backend se load hon aur screen dobara active hone par refresh hon. */
+import React, {useCallback, useState} from 'react';
+import {useFocusEffect} from '@react-navigation/native';
 
 import {
   SafeAreaView,
@@ -10,34 +14,138 @@ import {
 } from 'react-native';
 
 
-const services = [
-  {
-    id: 1,
-    service: 'Milk Delivery',
-    customer: 'Dr. Moiz Ahmed',
-    time: '07:00 AM – 08:00 AM',
-    address: 'House # 42, Street 5, DHA Phase 6',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-  },
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Hardcoded `services` array (3 dummy Milk Delivery cards) remove kar di gayi.
+   Ab data GET /api/visitors/accepted-services/:userId se aata hai
+   (wohi API jo VisitorHome use karta hai). */
 
-  {
-    id: 2,
-    service: 'Milk Delivery',
-    customer: 'Mrs. Ayesha Khan',
-    time: '07:30 AM – 08:30 AM',
-    address: 'Flat 304, Block B, Gulshan-e-Iqbal',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-  },
-
-  {
-    id: 3,
-    service: 'Milk Delivery',
-    customer: 'Mr. Hassan Raza',
-    time: '08:00 AM – 09:00 AM',
-    address: 'House 45, Sector C, Bahria Town',
-    days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-  },
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Days ko Monday se Sunday ke order mein sort karne ke liye */
+const weekOrder = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
 ];
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Database service name -> card par dikhne wala naam (VisitorHome jaisa) */
+const formatServiceName = service => {
+
+  if (service === 'Milkman') {
+    return 'Milk Delivery';
+  }
+
+  if (service === 'Garbage Collector') {
+    return 'Garbage Collection';
+  }
+
+  if (service === 'Newspaper') {
+    return 'Newspaper Delivery';
+  }
+
+  return service || 'Service';
+};
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Database TIME (HH:mm:ss) -> 12-hour AM/PM. Time na ho to '' return hota hai. */
+const formatTime = time => {
+
+  if (!time) {
+    return '';
+  }
+
+  const parts = String(time).split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+
+  if (Number.isNaN(hours) || minutes === undefined) {
+    return '';
+  }
+
+  const hour24 = hours % 24;
+  const period = hour24 >= 12 ? 'PM' : 'AM';
+  const displayHour = hour24 % 12 === 0 ? 12 : hour24 % 12;
+
+  return `${displayHour}:${minutes.slice(0, 2)} ${period}`;
+};
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* "7:00 AM – 8:00 AM". End time na ho to sirf start, start na ho to kuch nahi. */
+const formatTimeRange = (fromTime, toTime) => {
+
+  const start = formatTime(fromTime);
+  const end = formatTime(toTime);
+
+  if (!start) {
+    return '';
+  }
+
+  return end ? `${start} – ${end}` : start;
+};
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Request ke selected_days se day chips ('Mon', 'Tue'...) banata hai.
+   Days sorted hote hain aur duplicate remove hote hain. Days na hon to [] return. */
+const getDayChips = service => {
+
+  if (!service.selected_days) {
+    return [];
+  }
+
+  const days = [];
+
+  String(service.selected_days)
+    .split(',')
+    .map(day => day.trim())
+    .filter(Boolean)
+    .forEach(day => {
+
+      const match = weekOrder.find(
+        weekDay => weekDay.toLowerCase() === day.toLowerCase(),
+      );
+
+      const dayName = match || day;
+
+      if (!days.includes(dayName)) {
+        days.push(dayName);
+      }
+    });
+
+  const dayIndex = day => {
+    const index = weekOrder.indexOf(day);
+    return index === -1 ? weekOrder.length : index;
+  };
+
+  return days
+    .sort((a, b) => dayIndex(a) - dayIndex(b))
+    .map(day => day.substring(0, 3));
+};
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Resident ka address: backend sirf area, city aur province bhejta hai (VisitorHome jaisa) */
+const getResidentAddress = service => {
+
+  const addressParts = [
+    service.resident_area,
+    service.resident_city,
+    service.resident_province,
+  ].filter(Boolean);
+
+  if (addressParts.length > 0) {
+    return addressParts.join(', ');
+  }
+
+  return 'Address not available';
+};
+
+/* ==================== ACTIVE SERVICES API ==================== */
+/* Request sirf tab active hai jab backend status ACCEPTED confirm kare */
+const isActiveRequest = service =>
+  String(service?.status || '').toUpperCase() === 'ACCEPTED';
 
 
 // MODIFIED: route add kiya taake Home/Activity/Profile se aane wale userId aur name read ho sakein
@@ -48,6 +156,100 @@ export default function ScheduleScreen({navigation, route}) {
 
   // ADDED: Visitor ka name, taake wapas Home bhejne par greeting sahi dikhe
   const visitorName = route.params?.name;
+
+
+  /* ==================== ACTIVE SERVICES API ==================== */
+  /* Backend se aane wali accepted services, loading flag, error message
+     aur Retry button ke liye reload counter */
+  const [services, setServices] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+
+  /* ==================== ACTIVE SERVICES API ==================== */
+  /* Sirf logged-in visitor (visitorUserId) ki accepted requests fetch hoti hain.
+     Pehli dafa open hone par, har dafa screen focus mein aane par aur Retry dabane par chalta hai. */
+  useFocusEffect(
+    useCallback(() => {
+
+      if (!visitorUserId) {
+        setServices([]);
+        setError('Visitor information is missing. Please go back and try again.');
+        setLoading(false);
+        return undefined;
+      }
+
+      // Screen focus kho de ya userId badal jaye to purana response ignore hoga
+      let isActive = true;
+
+      fetch(
+        `http://localhost:5000/api/visitors/accepted-services/${visitorUserId}`,
+      )
+        .then(response =>
+          response
+            .json()
+            .catch(() => null)
+            .then(data => {
+
+              if (!response.ok) {
+                throw new Error(
+                  (data && data.message) || 'Server error',
+                );
+              }
+
+              return data;
+            }),
+        )
+        .then(data => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log('Visitor Schedule services:', data);
+
+          const list =
+            data && Array.isArray(data.services)
+              ? data.services
+              : [];
+
+          setServices(list.filter(isActiveRequest));
+          setError('');
+        })
+        .catch(apiError => {
+
+          if (!isActive) {
+            return;
+          }
+
+          console.log('Visitor Schedule API error:', apiError);
+
+          setError(
+            'Active services could not be loaded. Please check your connection and try again.',
+          );
+        })
+        .finally(() => {
+          if (isActive) {
+            setLoading(false);
+          }
+        });
+
+      return () => {
+        isActive = false;
+      };
+
+    }, [visitorUserId, reloadKey]),
+  );
+
+
+  /* ==================== ACTIVE SERVICES API ==================== */
+  /* Retry button: loading message dobara dikhata hai aur services dobara load karta hai */
+  const handleRetry = () => {
+    setError('');
+    setLoading(true);
+    setReloadKey(key => key + 1);
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -105,21 +307,76 @@ export default function ScheduleScreen({navigation, route}) {
             Active Services
           </Text>
 
-          <Text style={styles.count}>
-            {services.length} services
-          </Text>
+          {/* ==================== ACTIVE SERVICES API ==================== */}
+          {/* Count ab real services ka hai; loading ke dauran count hide rehta hai */}
+          {!loading && (
+            <Text style={styles.count}>
+              {services.length} services
+            </Text>
+          )}
 
         </View>
 
 
+        {/* ==================== ACTIVE SERVICES API ==================== */}
+        {/* Services load hote waqt loading message */}
+        {loading && (
+          <Text style={styles.statusText}>
+            Loading services...
+          </Text>
+        )}
+
+
+        {/* ==================== ACTIVE SERVICES API ==================== */}
+        {/* API fail ho to error message aur Retry button */}
+        {!loading && error !== '' && (
+
+          <View style={styles.errorBox}>
+
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={handleRetry}
+            >
+
+              <Text style={styles.retryText}>
+                Retry
+              </Text>
+
+            </TouchableOpacity>
+
+          </View>
+
+        )}
+
+
+        {/* ==================== ACTIVE SERVICES API ==================== */}
+        {/* Koi accepted request na ho to empty-state message */}
+        {!loading && error === '' && services.length === 0 && (
+          <Text style={styles.statusText}>
+            No active services yet.
+          </Text>
+        )}
+
+
         {/* Service Cards */}
 
-        {services.map(item => (
+        {/* ==================== ACTIVE SERVICES API ==================== */}
+        {/* Har accepted request (request_id) ka ek card. Saare days usi card mein dikhte hain. */}
+        {!loading && services.map((item, index) => {
+
+          const dayChips = getDayChips(item);
+          const serviceTime = formatTimeRange(item.from_time, item.to_time);
+
+          return (
 
           // CHANGED: Service card ko clickable banaya
           // ResidentRecord screen par navigate karne ke liye
           <TouchableOpacity
-            key={item.id}
+            key={item.request_id || index}
             style={styles.card}
             onPress={() => navigation.navigate('ResidentRecord')}
           >
@@ -127,7 +384,7 @@ export default function ScheduleScreen({navigation, route}) {
             <View style={styles.cardHeader}>
 
               <Text style={styles.serviceName}>
-                {item.service}
+                {formatServiceName(item.service)}
               </Text>
 
               <View style={styles.active}>
@@ -142,42 +399,50 @@ export default function ScheduleScreen({navigation, route}) {
 
 
             <Text style={styles.customer}>
-              {item.customer}
+              {item.resident_name || 'Resident'}
             </Text>
+
+
+            {serviceTime !== '' && (
+              <Text style={styles.detail}>
+                🕐 {serviceTime}
+              </Text>
+            )}
 
 
             <Text style={styles.detail}>
-              🕐 {item.time}
+              📍 {getResidentAddress(item)}
             </Text>
 
 
-            <Text style={styles.detail}>
-              📍 {item.address}
-            </Text>
+            {dayChips.length > 0 && (
 
+              <View style={styles.days}>
 
-            <View style={styles.days}>
+                {dayChips.map(day => (
 
-              {item.days.map(day => (
+                  <View
+                    key={day}
+                    style={styles.day}
+                  >
 
-                <View
-                  key={day}
-                  style={styles.day}
-                >
+                    <Text style={styles.dayText}>
+                      {day}
+                    </Text>
 
-                  <Text style={styles.dayText}>
-                    {day}
-                  </Text>
+                  </View>
 
-                </View>
+                ))}
 
-              ))}
+              </View>
 
-            </View>
+            )}
 
           </TouchableOpacity>
 
-        ))}
+          );
+
+        })}
 
       </ScrollView>
 
@@ -391,6 +656,61 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
 
     borderRadius: 15,
+  },
+
+
+  /* ==================== ACTIVE SERVICES API ==================== */
+  /* Loading / empty message */
+  statusText: {
+    textAlign: 'center',
+    marginTop: 30,
+    fontSize: 14,
+    color: '#64748B',
+  },
+
+
+  /* ==================== ACTIVE SERVICES API ==================== */
+  /* Error message box aur Retry button */
+  errorBox: {
+    backgroundColor: 'white',
+
+    borderRadius: 15,
+
+    padding: 16,
+
+    alignItems: 'center',
+
+    marginBottom: 13,
+
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+
+    elevation: 2,
+  },
+
+
+  errorText: {
+    fontSize: 12,
+    color: '#B91C1C',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+
+
+  retryButton: {
+    backgroundColor: '#2563EB',
+
+    borderRadius: 10,
+
+    paddingVertical: 9,
+    paddingHorizontal: 26,
+  },
+
+
+  retryText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
 
 

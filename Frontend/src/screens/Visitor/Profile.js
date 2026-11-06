@@ -93,7 +93,7 @@ export default function Profile({navigation, route}) {
             </View>
 
             <View style={styles.profileInfo}>
-              <Text style={styles.name}>Ali Jahanzaib</Text>
+              <Text style={styles.name}>SIR MUNIR</Text>
               <Text style={styles.role}>💼 Milk Delivery</Text>
 
               <View style={styles.badgeRow}>
@@ -111,7 +111,7 @@ export default function Profile({navigation, route}) {
             </View>
 
             <View style={styles.statBox}>
-              <Text style={styles.statNumber}>3</Text>
+              <Text style={styles.statNumber}>6</Text>
               <Text style={styles.statLabel}>Total Jobs</Text>
             </View>
 

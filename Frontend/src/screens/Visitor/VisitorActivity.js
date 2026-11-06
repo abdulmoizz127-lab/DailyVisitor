@@ -1,4 +1,8 @@
-import React, {useState} from 'react';
+// CHANGED: useCallback, useRef add kiye (backend fetch ke liye); useEffect ki jagah useFocusEffect use ho raha hai
+import React, {useState, useCallback, useRef} from 'react';
+
+// ADDED: Screen khulne (aur dobara focus hone) par data load karne ke liye (react-navigation ka apna hook)
+import {useFocusEffect} from '@react-navigation/native';
 
 import {
   SafeAreaView,
@@ -9,28 +13,238 @@ import {
   StyleSheet,
 } from 'react-native';
 
-// Dummy activity data - backend baad mein connect hoga
-const pendingRequests = [
-  {
-    id: 1,
-    service: 'Milk Delivery',
-    resident: 'Dr. Moiz Ahmed',
-    date: '2026-10-10',
-    time: '07:00 AM',
-    status: 'Waiting',
-  },
+// ==================== HELPERS (START) ====================
+// ADDED: Neeche ke helper functions Visitor Home ki logic jaisi hain, taake Home aur Activity ke services same hon.
+
+// ADDED: Weekday names (JavaScript getDay() ke order mein: Sunday = 0)
+const WEEKDAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
 ];
 
-const completedRequests = [
-  {
-    id: 2,
-    service: 'Newspaper Delivery',
-    resident: 'Mrs. Ayesha Khan',
-    date: '2026-10-08',
-    time: '06:00 AM',
-    status: 'Completed',
-  },
-];
+// ADDED: Home jaisa time format: "07:00:00" -> "7:00 AM"
+const formatTime = time => {
+
+  if (!time) {
+    return '';
+  }
+
+  const parts = String(time).split(':');
+  const hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+
+  if (isNaN(hours)) {
+    return '';
+  }
+
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const displayHour = hours % 12 === 0 ? 12 : hours % 12;
+
+  return `${displayHour}:${minutes} ${period}`;
+};
+
+// ADDED: Home jaisa service name: Milkman -> Milk Delivery, etc.
+const formatServiceName = service => {
+
+  if (service === 'Milkman') {
+    return 'Milk Delivery';
+  }
+
+  if (service === 'Garbage Collector') {
+    return 'Garbage Collection';
+  }
+
+  if (service === 'Newspaper') {
+    return 'Newspaper Delivery';
+  }
+
+  return service || 'Service';
+};
+
+// ADDED: Aaj ka weekday name (Home ke getTodayName jaisa)
+const getTodayName = () => {
+  return WEEKDAY_NAMES[new Date().getDay()];
+};
+
+// ADDED: Home se aaya hua selectedDay valid weekday ho to wohi return karta hai, warna null
+const getValidWeekday = value => {
+
+  if (!value) {
+    return null;
+  }
+
+  const match = WEEKDAY_NAMES.find(
+    day => day.toLowerCase() === String(value).toLowerCase(),
+  );
+
+  return match || null;
+};
+
+// ADDED: Agar Home se selectedDay na aaye to Home ki default logic: aaj (agar available) warna provider ka pehla day
+const getDefaultDay = providerDays => {
+
+  if (!providerDays || providerDays.length === 0) {
+    return null;
+  }
+
+  const todayName = getTodayName();
+
+  const todayAvailable = providerDays.find(
+    day => String(day).toLowerCase() === todayName.toLowerCase(),
+  );
+
+  return todayAvailable || providerDays[0];
+};
+
+// CHANGED: Home ke selectedDayServices aur todayServices ki logic bilkul wahi hai (filter + sort),
+// sirf Home ke state variable ki jagah parameters use kiye gaye hain.
+const getServicesForDay = (acceptedServices, selectedDay) => {
+
+  // Selected day resident ki request mein hai ya nahi (Home jaisa filter)
+  const selectedDayServices = acceptedServices.filter(service => {
+
+    if (
+      !selectedDay ||
+      !service.selected_days
+    ) {
+      return false;
+    }
+
+    const serviceDays =
+      String(service.selected_days)
+        .split(',')
+        .map(day => day.trim().toLowerCase());
+
+    return serviceDays.includes(
+      selectedDay.toLowerCase(),
+    );
+  });
+
+  // Home jaisi sorting: from_time, phir to_time, phir route_order
+  return [...selectedDayServices].sort((a, b) => {
+    const timeA = String(a.from_time || '');
+    const timeB = String(b.from_time || '');
+
+    if (timeA !== timeB) {
+      return timeA.localeCompare(timeB);
+    }
+
+    const toTimeA = String(a.to_time || '');
+    const toTimeB = String(b.to_time || '');
+
+    if (toTimeA !== toTimeB) {
+      return toTimeA.localeCompare(toTimeB);
+    }
+
+    return Number(a.route_order || 999) - Number(b.route_order || 999);
+  });
+};
+
+// ADDED: Backend ki date ko local date (midnight) mein badalta hai, bilkul Home ke formatDate jaisa
+// (new Date(date) phir local din). Invalid/missing date par null.
+const parseServiceDate = value => {
+
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+
+  if (isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return new Date(
+    parsed.getFullYear(),
+    parsed.getMonth(),
+    parsed.getDate(),
+  );
+};
+
+// ADDED: Date ko "YYYY-MM-DD" text mein badalta hai (local date, UTC shift ke baghair)
+const formatDateKey = date => {
+
+  if (!date) {
+    return '';
+  }
+
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${date.getFullYear()}-${month}-${day}`;
+};
+
+// ADDED: Asal scheduled delivery date = selected weekday ki pehli date jo aaj ya subscription start_date
+// (jo bhi baad mein ho) ke baad aaye. start_date sirf subscription ki shuruaat hai, delivery date nahi.
+const getScheduledDate = (dayName, startDateValue, now = new Date()) => {
+
+  const dayIndex = WEEKDAY_NAMES.findIndex(
+    day => day.toLowerCase() === String(dayName).toLowerCase(),
+  );
+
+  if (dayIndex === -1) {
+    return null;
+  }
+
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  const startDate = parseServiceDate(startDateValue);
+
+  // Subscription abhi shuru nahi hui ho to us ke start_date se aage ki pehli matching date
+  const baseDate =
+    startDate && startDate.getTime() > today.getTime()
+      ? startDate
+      : today;
+
+  const daysAhead = (dayIndex - baseDate.getDay() + 7) % 7;
+
+  return new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate() + daysAhead,
+  );
+};
+
+// CHANGED: Backend service ko existing Activity card ke fields mein map karta hai.
+// date = asal scheduled delivery date, startsOn = subscription start date (sirf tab jab abhi shuru nahi hui).
+// time = Home ki tarah delivery_start_time (assigned slot) ya from_time.
+const mapServiceToPending = (service, selectedDay, now = new Date()) => {
+
+  const today = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
+
+  const startDate = parseServiceDate(service.start_date);
+
+  return {
+    id: service.request_id,
+    service: formatServiceName(service.service),
+    resident: service.resident_name || 'Unknown',
+    date: formatDateKey(getScheduledDate(selectedDay, service.start_date, now)),
+    startsOn:
+      startDate && startDate.getTime() > today.getTime()
+        ? formatDateKey(startDate)
+        : '',
+    time: formatTime(service.delivery_start_time || service.from_time),
+    status: 'Waiting',
+  };
+};
+// ==================== HELPERS (END) ====================
+
+// CHANGED: Dummy pendingRequests hata diya gaya (ab backend se aata hai).
+// CHANGED: Completed abhi khaali hai (delivery workflow agle phase mein), is liye count 0 rahega.
+const completedRequests = [];
 
 // MODIFIED: route add kiya taake Visitor Home se aane wale userId aur name read ho sakein
 export default function VisitorActivity({navigation, route}) {
@@ -42,6 +256,105 @@ export default function VisitorActivity({navigation, route}) {
   const visitorName = route.params?.name;
 
   const [selectedTab, setSelectedTab] = useState('Pending');
+
+  // ADDED: Visitor Home ka selected weekday (Home Activity tab dabate waqt navigation params mein bhejta hai)
+  const homeSelectedDay = route.params?.selectedDay;
+
+  // CHANGED: Backend se aane wali raw accepted services aur provider days (filter render par hota hai)
+  const [acceptedServices, setAcceptedServices] = useState([]);
+  const [providerDays, setProviderDays] = useState([]);
+
+  // ADDED: Loading aur error state
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  // ADDED: Har request ka number. Sirf sab se nayi request ka jawab use hota hai, purani request nayi ko block nahi karti.
+  const latestRequest = useRef(0);
+
+  // CHANGED: Existing accepted-services API se services lata hai (har call par nayi request)
+  const loadServices = useCallback(() => {
+
+    if (!visitorUserId) {
+      setLoading(false);
+      setAcceptedServices([]);
+      setProviderDays([]);
+      setErrorMessage('Visitor ID not found. Please log in again.');
+      return;
+    }
+
+    latestRequest.current += 1;
+    const requestNumber = latestRequest.current;
+
+    setLoading(true);
+
+    fetch(
+      `http://localhost:5000/api/visitors/accepted-services/${visitorUserId}`,
+    )
+      .then(response => {
+
+        if (!response.ok) {
+          throw new Error('Server returned ' + response.status);
+        }
+
+        return response.json();
+      })
+      .then(data => {
+
+        // Purani request ka jawab ignore karo
+        if (requestNumber !== latestRequest.current) {
+          return;
+        }
+
+        setAcceptedServices(
+          Array.isArray(data.services) ? data.services : [],
+        );
+
+        setProviderDays(
+          Array.isArray(data.serviceDays) ? data.serviceDays : [],
+        );
+
+        setErrorMessage('');
+      })
+      .catch(error => {
+
+        if (requestNumber !== latestRequest.current) {
+          return;
+        }
+
+        console.log('Visitor Activity API error:', error);
+        setErrorMessage('Pending requests could not be loaded.');
+      })
+      .finally(() => {
+
+        if (requestNumber === latestRequest.current) {
+          setLoading(false);
+        }
+      });
+  }, [visitorUserId]);
+
+  // CHANGED: Screen khulne par aur har dafa Activity dobara focus ho to fresh data lao (ek hi jagah se, duplicate nahi).
+  // Screen se bahar jaate (ya unmount hote) waqt chal rahi request ka jawab ignore ho jata hai.
+  useFocusEffect(
+    useCallback(() => {
+
+      loadServices();
+
+      return () => {
+        latestRequest.current += 1;
+      };
+    }, [loadServices]),
+  );
+
+  // ADDED: Home ka selected weekday; Home se na aaye (ya invalid ho) to Home ki default day logic
+  const selectedDay =
+    getValidWeekday(homeSelectedDay) ||
+    getDefaultDay(providerDays);
+
+  // CHANGED: Pending list ab selected day ke mutabiq filter hoti hai, is liye count bhi asal filtered services ka hai
+  const pendingRequests = getServicesForDay(
+    acceptedServices,
+    selectedDay,
+  ).map(service => mapServiceToPending(service, selectedDay));
 
   // Selected tab ke according requests show hongi
   const requests =
@@ -73,6 +386,7 @@ export default function VisitorActivity({navigation, route}) {
                 selectedTab === 'Pending' && styles.activeTabText,
               ]}
             >
+              {/* CHANGED: count ab dynamic hai (pendingRequests backend se aati hain) */}
               Pending {pendingRequests.length}
             </Text>
           </TouchableOpacity>
@@ -119,9 +433,17 @@ export default function VisitorActivity({navigation, route}) {
                   {item.resident}
                 </Text>
 
+                {/* CHANGED: asal scheduled delivery date aur time (date na ho to sirf time) */}
                 <Text style={styles.date}>
-                  {item.date} • {item.time}
+                  {item.date ? `${item.date} • ${item.time}` : item.time}
                 </Text>
+
+                {/* ADDED: Agar subscription abhi shuru nahi hui to uski start date alag se dikhate hain */}
+                {item.startsOn ? (
+                  <Text style={styles.date}>
+                    Subscription starts {item.startsOn}
+                  </Text>
+                ) : null}
               </View>
 
               <View
@@ -145,8 +467,13 @@ export default function VisitorActivity({navigation, route}) {
           ))
         ) : (
           <View style={styles.emptyCard}>
+            {/* CHANGED: Pending tab par loading / error message, warna pehle wala empty message */}
             <Text style={styles.emptyText}>
-              No {selectedTab.toLowerCase()} requests.
+              {selectedTab === 'Pending' && loading
+                ? 'Loading requests...'
+                : selectedTab === 'Pending' && errorMessage
+                ? errorMessage
+                : `No ${selectedTab.toLowerCase()} requests.`}
             </Text>
           </View>
         )}
@@ -265,13 +592,16 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 22,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    elevation: 4,
-  },
+  backgroundColor: '#FFFFFF',
+  borderRadius: 22,
+  padding: 16,
+  flexDirection: 'row',
+  alignItems: 'center',
+  elevation: 4,
+
+  // ADDED: Cards ke darmiyan vertical gap
+  marginBottom: 12,
+},
 
   avatar: {
     width: 52,

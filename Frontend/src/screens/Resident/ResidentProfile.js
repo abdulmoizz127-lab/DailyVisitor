@@ -13,28 +13,32 @@ import {
 // Resident ki sample information
 const resident = {
   memberId: 'R1',
-  name: 'Dr. Moiz Ahmed',
-  location: 'House # 42, Street 5, DHA Phase 6, Karachi',
+  name: 'SIR IRFAN',
+  location: '📍 Dhoke Paracha, Metropolitan Corporation Rawalpindi, Punjab',
   activeServices: 3,
-  initials: 'DM',
+  initials: 'SI',
   status: 'Resident',
   verified: true,
 };
 
-// Resident ke saved neighbours ki sample list
-const neighbours = [
+// CHANGED: "neighbours" dummy list replaced by "initialAlternates".
+// Each item now has "address" and "locationLabel" (was "relation") fields.
+// Only used as the starting value of the alternates state below.
+const initialAlternates = [
   {
     id: '1',
     name: 'Ahmad Raza',
     phone: '0300-1234567',
-    relation: 'Next door (right)',
+    address: 'House #44, Street 5, DHA Phase 6, Karachi',
+    locationLabel: 'Next door (right)',
     initials: 'AR',
   },
   {
     id: '2',
     name: 'Sana Khan',
     phone: '0333-9876543',
-    relation: 'Two doors down (left)',
+    address: 'House #40, Street 5, DHA Phase 6, Karachi',
+    locationLabel: 'Two doors down (left)',
     initials: 'SK',
   },
 ];
@@ -48,7 +52,12 @@ export default function ResidentProfileScreen({ navigation, route }) {
   const residentId = route?.params?.userId;
   const residentNameParam = route?.params?.name;
 
+  // CHANGED: Tab key renamed from 'neighbours' to 'alternates'
   const [activeTab, setActiveTab] = useState('profile');
+
+  // ADDED: Saved alternates kept in state (top level) so the delete button can remove a card
+  // and the count in the header / tab updates automatically. Dummy data only.
+  const [alternates, setAlternates] = useState(initialAlternates);
 
   // Edit Profile button ka action
   const handleEditProfile = () => {
@@ -100,9 +109,12 @@ export default function ResidentProfileScreen({ navigation, route }) {
 
             // CHANGED: Resident login route use karein
             if (routeNames.includes('ResidentLogin')) {
+              // CHANGED: Reset to [Welcome, ResidentLogin] instead of only [ResidentLogin].
+              // All authenticated Resident screens are still removed from the stack, but the
+              // Login back arrow now has a valid previous screen (Welcome, registered in App.js).
               navigation.reset({
-                index: 0,
-                routes: [{ name: 'ResidentLogin' }],
+                index: 1,
+                routes: [{ name: 'Welcome' }, { name: 'ResidentLogin' }],
               });
             } else {
               Alert.alert(
@@ -117,18 +129,36 @@ export default function ResidentProfileScreen({ navigation, route }) {
     );
   };
 
-  // Neighbour par click karne ka action
-  const handleNeighbourPress = (neighbour) => {
-    const routeNames = navigation.getState().routeNames || [];
+  // CHANGED: The old handleNeighbourPress (which pointed to a non-existing
+  // 'ResidentNeighbourDetail' route) was removed. Alternate cards are now display-only
+  // with a delete button, replaced by the two handlers below.
 
-    if (routeNames.includes('ResidentNeighbourDetail')) {
-      navigation.navigate('ResidentNeighbourDetail', { neighbour });
-      return;
-    }
+  // ADDED: "Add New" button - opens the AddAlternate screen and keeps userId/name params
+  const handleAddNewAlternate = () => {
+    navigation.navigate('AddAlternate', {
+      userId: residentId,
+      name: residentNameParam,
+    });
+  };
 
+  // ADDED: Delete icon action - asks for confirmation, then removes the alternate from state (dummy data only)
+  const handleDeleteAlternate = (alternate) => {
     Alert.alert(
-      neighbour.name,
-      `${neighbour.phone}\n${neighbour.relation}`,
+      'Remove Alternate',
+      `Are you sure you want to remove ${alternate.name} from your alternates?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setAlternates((prev) =>
+              prev.filter((item) => item.id !== alternate.id),
+            );
+          },
+        },
+      ],
+      { cancelable: true },
     );
   };
 
@@ -212,7 +242,7 @@ export default function ResidentProfileScreen({ navigation, route }) {
 
             {resident.verified && (
               <View style={styles.badge}>
-                <Text style={styles.badgeText}>Verified</Text>
+                <Text style={styles.badgeText}></Text>
               </View>
             )}
           </View>
@@ -227,8 +257,10 @@ export default function ResidentProfileScreen({ navigation, route }) {
             <View style={styles.statDivider} />
 
             <View style={styles.statCol}>
-              <Text style={styles.statValue}>{neighbours.length}</Text>
-              <Text style={styles.statLabel}>Neighbours</Text>
+              {/* CHANGED: Shows the number of saved alternates (was neighbours) */}
+              <Text style={styles.statValue}>{alternates.length}</Text>
+              {/* CHANGED: Label renamed from "Neighbours" to "Alternates" */}
+              <Text style={styles.statLabel}>Alternates</Text>
             </View>
 
             <View style={styles.statDivider} />
@@ -242,7 +274,7 @@ export default function ResidentProfileScreen({ navigation, route }) {
           </View>
         </View>
 
-        {/* Profile aur Neighbours tabs */}
+        {/* CHANGED: Tabs are now "Profile" and "Alternates" (was Neighbours) */}
         <View style={styles.tabsRow}>
           <TouchableOpacity
             style={[
@@ -265,18 +297,18 @@ export default function ResidentProfileScreen({ navigation, route }) {
           <TouchableOpacity
             style={[
               styles.tabBtn,
-              activeTab === 'neighbours' && styles.tabBtnActive,
+              activeTab === 'alternates' && styles.tabBtnActive,
             ]}
-            onPress={() => setActiveTab('neighbours')}
+            onPress={() => setActiveTab('alternates')}
             activeOpacity={0.8}
           >
             <Text
               style={[
                 styles.tabText,
-                activeTab === 'neighbours' && styles.tabTextActive,
+                activeTab === 'alternates' && styles.tabTextActive,
               ]}
             >
-              Neighbours ({neighbours.length})
+              Alternates ({alternates.length})
             </Text>
           </TouchableOpacity>
         </View>
@@ -364,37 +396,63 @@ export default function ResidentProfileScreen({ navigation, route }) {
             </>
           ) : (
             <>
-              {/* Neighbours list */}
-              <Text style={styles.sectionTitle}>Neighbours</Text>
+              {/* CHANGED: Neighbours section replaced by "My Alternates" section */}
+              {/* ADDED: Heading, description and "Add New" button row */}
+              <View style={styles.alternatesHeaderRow}>
+                <View style={styles.alternatesHeaderText}>
+                  <Text style={styles.alternatesTitle}>My Alternates</Text>
+                  <Text style={styles.alternatesDescription}>
+                    Receive your deliveries when you are out of station.
+                  </Text>
+                </View>
 
-              {neighbours.map((neighbour) => (
                 <TouchableOpacity
-                  key={neighbour.id}
-                  style={styles.neighbourCard}
-                  onPress={() => handleNeighbourPress(neighbour)}
-                  activeOpacity={0.75}
+                  style={styles.addNewBtn}
+                  onPress={handleAddNewAlternate}
+                  activeOpacity={0.85}
                 >
-                  <View style={styles.neighbourAvatar}>
-                    <Text style={styles.neighbourAvatarText}>
-                      {neighbour.initials}
-                    </Text>
-                  </View>
-
-                  <View style={styles.neighbourInfo}>
-                    <Text style={styles.neighbourName}>
-                      {neighbour.name}
-                    </Text>
-                    <Text style={styles.neighbourPhone}>
-                      {neighbour.phone}
-                    </Text>
-                    <Text style={styles.neighbourRelation}>
-                      {neighbour.relation}
-                    </Text>
-                  </View>
-
-                  <Text style={styles.chevron}>›</Text>
+                  <Text style={styles.addNewBtnText}>+ Add New</Text>
                 </TouchableOpacity>
+              </View>
+
+              {/* ADDED: Saved alternate cards (avatar, name, phone, address, location label, delete icon) */}
+              {alternates.map((alternate) => (
+                <View key={alternate.id} style={styles.alternateCard}>
+                  <View style={styles.alternateAvatar}>
+                    <Text style={styles.alternateAvatarText}>
+                      {alternate.initials}
+                    </Text>
+                  </View>
+
+                  <View style={styles.alternateInfo}>
+                    <Text style={styles.alternateName}>{alternate.name}</Text>
+                    <Text style={styles.alternatePhone}>
+                      {alternate.phone}
+                    </Text>
+                    <Text style={styles.alternateAddress}>
+                      {alternate.address}
+                    </Text>
+                    <Text style={styles.alternateLocationLabel}>
+                      {alternate.locationLabel}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDeleteAlternate(alternate)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.deleteIcon}>🗑️</Text>
+                  </TouchableOpacity>
+                </View>
               ))}
+
+              {/* ADDED: Empty message when every alternate has been removed */}
+              {alternates.length === 0 && (
+                <Text style={styles.emptyAlternatesText}>
+                  No alternates saved yet. Tap "Add New" to add one.
+                </Text>
+              )}
 
               <Text style={styles.versionText}>
                 Smart Visitor Management v1.0
@@ -707,8 +765,48 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // Neighbour cards
-  neighbourCard: {
+  // ADDED: "My Alternates" heading row (title + description on the left, Add New on the right)
+  alternatesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+
+  alternatesHeaderText: {
+    flex: 1,
+    paddingRight: 12,
+  },
+
+  alternatesTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#111827',
+    marginBottom: 4,
+  },
+
+  alternatesDescription: {
+    fontSize: 12.5,
+    lineHeight: 18,
+    color: '#64748b',
+  },
+
+  // ADDED: "Add New" button
+  addNewBtn: {
+    backgroundColor: BLUE,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 18,
+  },
+
+  addNewBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#ffffff',
+  },
+
+  // CHANGED: Former neighbour card styles renamed to alternate card styles
+  alternateCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
@@ -724,7 +822,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
 
-  neighbourAvatar: {
+  alternateAvatar: {
     width: 42,
     height: 42,
     borderRadius: 21,
@@ -734,33 +832,63 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
 
-  neighbourAvatarText: {
+  alternateAvatarText: {
     fontSize: 13,
     fontWeight: '700',
     color: BLUE,
   },
 
-  neighbourInfo: {
+  alternateInfo: {
     flex: 1,
   },
 
-  neighbourName: {
+  alternateName: {
     fontSize: 15,
     fontWeight: '700',
     color: '#111827',
     marginBottom: 2,
   },
 
-  neighbourPhone: {
+  alternatePhone: {
     fontSize: 13,
     color: '#64748b',
     marginBottom: 2,
   },
 
-  neighbourRelation: {
+  // ADDED: Address line style
+  alternateAddress: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 3,
+  },
+
+  alternateLocationLabel: {
     fontSize: 12,
     color: BLUE,
     fontWeight: '600',
+  },
+
+  // ADDED: Delete button and icon
+  deleteBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#fde8ec',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+
+  deleteIcon: {
+    fontSize: 15,
+  },
+
+  // ADDED: Message shown when there are no saved alternates
+  emptyAlternatesText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: '#94a3b8',
+    marginVertical: 20,
   },
 
   // UPDATED: Home screen jaisi bottom navigation bar

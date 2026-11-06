@@ -49,19 +49,19 @@ export default function ResidentRecord({navigation}) {
             <View style={styles.profileInfo}>
 
               <Text style={styles.profileName}>
-                Dr.Moiz
+                SIR IRFAN
               </Text>
 
               <Text style={styles.profileTime}>
-                ⭐ 4.8  •  🕐 07:00 AM - 07:30 AM
+                ⭐ 4.8  •  🕐 12:00 PM - 1:30 PM
               </Text>
 
               <Text style={styles.profileAddress}>
-                I-10
+                📍 Dhoke Paracha, Metropolitan Corporation Rawalpindi, Punjab
               </Text>
 
               <Text style={styles.profileSince}>
-                Active since sep 1, 2026
+                Active since oct 1, 2026
               </Text>
 
             </View>

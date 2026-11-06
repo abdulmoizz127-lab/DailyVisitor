@@ -12,9 +12,9 @@ import {
 
 // ADDED: Resident ki active services
 const services = [
-  {id: 1, name: 'Milk Delivery', provider: 'Ali Jahanzaib'},
-  {id: 2, name: 'Newspaper', provider: 'Abdul Moiz'},
-  {id: 3, name: 'Garbage', provider: 'Muhammad Jan'},
+  {id: 1, name: 'Milk Delivery', provider: 'SIR MUNIR'},
+  {id: 2, name: 'Newspaper', provider: 'ABRAR'},
+  {id: 3, name: 'Garbage', provider: 'SAIM'},
 ];
 
 export default function ResidentOutOfStation({navigation}) {

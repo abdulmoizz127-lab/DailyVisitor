@@ -70,6 +70,87 @@ router.post('/signup', (req, res) => {
   }
 
 
+  /* ==================== VALIDATE SERVICE DAYS AND TIME SLOTS ==================== */
+
+  const validDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday'
+  ];
+
+  const cleanShifts = [];
+
+
+  if (
+    !Array.isArray(days) ||
+    days.length === 0 ||
+    typeof timeSlots !== 'object' ||
+    Array.isArray(timeSlots)
+  ) {
+    return res.status(400).json({
+      message: 'Please select service days and add time slots'
+    });
+  }
+
+
+  const uniqueDays = [...new Set(days)];
+
+
+  for (const day of uniqueDays) {
+
+    if (!validDays.includes(day)) {
+      return res.status(400).json({
+        message: 'Invalid service day: ' + day
+      });
+    }
+
+
+    const daySlots = Array.isArray(timeSlots[day])
+      ? timeSlots[day]
+      : [];
+
+
+    if (daySlots.length === 0) {
+      return res.status(400).json({
+        message: 'Please add at least one time slot for ' + day
+      });
+    }
+
+
+    const uniqueSlots = [...new Set(daySlots)];
+
+
+    for (const slot of uniqueSlots) {
+
+      const parts = String(slot).split(' - ');
+
+
+      if (
+        parts.length !== 2 ||
+        !parts[0].trim() ||
+        !parts[1].trim()
+      ) {
+        return res.status(400).json({
+          message: 'Invalid time slot for ' + day
+        });
+      }
+
+
+      cleanShifts.push([
+        day,
+        parts[0].trim(),
+        parts[1].trim()
+      ]);
+
+    }
+
+  }
+
+
   // ==================== CHECK SERVICE PRICE ====================
   // Selected service ke according pricing validate kar rahe hain
 
@@ -465,8 +546,7 @@ router.post('/signup', (req, res) => {
                         );
 
 
-                        // ==================== INSERT SHIFT ====================
-                        // Provider ke selected days aur time slots Shift table mein save kar rahe hain
+                        /* ==================== INSERT SHIFT ==================== */
                         const shiftSql = `
                           INSERT INTO Shift
                           (
@@ -475,130 +555,63 @@ router.post('/signup', (req, res) => {
                             start_time,
                             end_time
                           )
-                          VALUES (?, ?, ?, ?)
+                          VALUES ?
                         `;
 
 
-                        // ==================== COUNT TOTAL SLOTS ====================
-                        // Sab selected days ke total time slots count kar rahe hain
-                        const totalSlots = days.reduce(
-                          (total, currentDay) => {
+                        const shiftRows = cleanShifts.map((shift) => {
 
-                            return total +
-                              (
-                                timeSlots[currentDay] || []
-                              ).length;
-
-                          },
-                          0
-                        );
-
-
-                        // ==================== CHECK TIME SLOT ====================
-                        // Kam az kam ek time slot required hai
-                        if (totalSlots === 0) {
-
-                          return res.status(400).json({
-                            message:
-                              'Please add at least one time slot'
-                          });
-
-                        }
-
-
-                        let totalShifts = 0;
-                        let shiftError = false;
-
-
-                        // ==================== INSERT EACH DAY ====================
-                        // Har selected day ke time slots database mein insert kar rahe hain
-                        days.forEach((day) => {
-
-                          const slots =
-                            timeSlots[day] || [];
-
-
-                          // ==================== INSERT EACH TIME SLOT ====================
-                          // Har individual time slot ko Shift table mein save kar rahe hain
-                          slots.forEach((slot) => {
-
-                            const [
-                              startTime,
-                              endTime
-                            ] = slot.split(' - ');
-
-
-                            db.query(
-                              shiftSql,
-                              [
-                                providerId,
-                                day,
-                                startTime,
-                                endTime
-                              ],
-                              (err) => {
-
-                                if (err) {
-
-                                  console.log(
-                                    'Shift insert error:',
-                                    err.message
-                                  );
-
-
-                                  if (!shiftError) {
-
-                                    shiftError = true;
-
-                                    return res.status(500).json({
-                                      message:
-                                        'Shift creation failed'
-                                    });
-
-                                  }
-
-                                  return;
-
-                                }
-
-
-                                totalShifts++;
-
-
-                                // ==================== SIGNUP SUCCESS ====================
-                                // Jab tamam shifts successfully save ho jayein to response send kar rahe hain
-                                if (
-                                  totalShifts === totalSlots &&
-                                  !shiftError
-                                ) {
-
-                                  res.status(201).json({
-
-                                    message:
-                                      'Visitor signup successful!',
-
-                                    userId:
-                                      userId,
-
-                                    providerId:
-                                      providerId,
-
-                                    addressId:
-                                      addressId,
-
-                                    shifts:
-                                      totalShifts
-
-                                  });
-
-                                }
-
-                              }
-                            );
-
-                          });
+                          return [
+                            providerId,
+                            shift[0],
+                            shift[1],
+                            shift[2]
+                          ];
 
                         });
+
+
+                        db.query(
+                          shiftSql,
+                          [shiftRows],
+                          (err, shiftResult) => {
+
+                            if (err) {
+
+                              console.log(
+                                'Shift insert error:',
+                                err.message
+                              );
+
+                              return res.status(500).json({
+                                message:
+                                  'Shift creation failed'
+                              });
+
+                            }
+
+
+                            res.status(201).json({
+
+                              message:
+                                'Visitor signup successful!',
+
+                              userId:
+                                userId,
+
+                              providerId:
+                                providerId,
+
+                              addressId:
+                                addressId,
+
+                              shifts:
+                                shiftResult.affectedRows
+
+                            });
+
+                          }
+                        );
 
                       }
                     );

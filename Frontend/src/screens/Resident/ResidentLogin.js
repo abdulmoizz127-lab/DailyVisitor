@@ -14,6 +14,21 @@ export default function ResidentLogin({navigation}) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // CHANGED: Safe back-arrow handler. goBack() is used only when a previous screen exists.
+  // If Login is the only screen in the stack, it resets to Welcome (registered in App.js)
+  // instead of calling goBack() with nothing to go back to, which caused the error.
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+
+    navigation.reset({
+      index: 0,
+      routes: [{name: 'Welcome'}],
+    });
+  };
+
   const handleLogin = async () => {
 
     // Check empty fields
@@ -104,8 +119,9 @@ onPress: () =>
 
       {/* Back */}
 
+      {/* CHANGED: Back arrow now uses handleBack instead of calling goBack() directly */}
       <TouchableOpacity
-        onPress={() => navigation.goBack()}
+        onPress={handleBack}
       >
         <Text style={styles.back}>
           ←
